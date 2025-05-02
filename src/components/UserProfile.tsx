@@ -10,7 +10,7 @@ const UserProfile = () => {
   return (
     <div className="flex flex-col">
       <div className="flex flex-col mb-2">
-        <h2 className="text-2xl font-bold">Name Surname</h2>
+        <h2 className="text-2xl font-bold">Lemley Mulder</h2>
         <div className="flex items-center">
           <div className="text-3xl font-bold tracking-wider">SKA<span className="text-primary/60">******</span></div>
         </div>
