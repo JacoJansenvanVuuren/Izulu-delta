@@ -8,60 +8,70 @@ const CompanyBadge = () => {
         <h2 className="text-3xl font-bold">IZULU</h2>
         <h3 className="text-2xl font-bold">DELTA</h3>
       </div>
-      <div className="relative overflow-hidden border-2 border-[#00ffcc] p-6 cod-section">
-        <div className="cod-text">Marine</div>
-        <div className="cod-text">Army</div>
-        <div className="cod-text">Soldier</div>
+      
+      <div className="badge-container relative w-[150px] h-[150px]">
+        <div className="circle absolute w-full h-full border-2 border-gray-500 rounded-full"></div>
+        <div className="diamond absolute w-full h-full rotate-45 border-2 border-gray-500"></div>
+        <div className="text absolute w-full h-full flex flex-col justify-center items-center font-['Permanent_Marker',_cursive] text-lg text-white">
+          <div>Marine</div>
+          <div>Army</div>
+          <div>Soldier</div>
+        </div>
       </div>
 
       <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
         
-        .cod-section {
-          position: relative;
-          overflow: hidden;
+        .badge-container {
           width: 150px;
-          text-align: center;
-          font-family: 'Orbitron', sans-serif;
-          color: #00ffcc;
+          height: 150px;
+          position: relative;
         }
         
-        .cod-section::before {
-          content: '';
+        .circle {
+          width: 100%;
+          height: 100%;
+          border: 2px solid #888;
+          border-radius: 50%;
           position: absolute;
           top: 0;
           left: 0;
+          animation: pulse 3s infinite alternate;
+        }
+        
+        .diamond {
+          width: 70%;
+          height: 70%;
+          position: absolute;
+          top: 15%;
+          left: 15%;
+          transform: rotate(45deg);
+          border: 2px solid #888;
+          box-sizing: border-box;
+        }
+        
+        .text {
+          position: absolute;
           width: 100%;
           height: 100%;
-          background: repeating-linear-gradient(
-            0deg,
-            rgba(0, 255, 204, 0.05),
-            rgba(0, 255, 204, 0.05) 2px,
-            transparent 2px,
-            transparent 4px
-          );
-          animation: scan 5s linear infinite;
-          pointer-events: none;
-        }
-        
-        @keyframes scan {
-          0% { background-position: 0 0; }
-          100% { background-position: 0 100%; }
-        }
-        
-        .cod-text {
+          top: 0;
+          left: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          font-family: 'Permanent Marker', cursive;
           font-size: 18px;
-          margin: 8px 0;
-          opacity: 0;
-          animation: fadeIn 1s forwards;
+          color: #fff;
         }
         
-        .cod-text:nth-child(1) { animation-delay: 0.5s; }
-        .cod-text:nth-child(2) { animation-delay: 1.5s; }
-        .cod-text:nth-child(3) { animation-delay: 2.5s; }
-        
-        @keyframes fadeIn {
-          to { opacity: 1; }
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(136, 136, 136, 0.4);
+          }
+          100% {
+            box-shadow: 0 0 0 10px rgba(136, 136, 136, 0);
+          }
         }
       `}</style>
     </div>
