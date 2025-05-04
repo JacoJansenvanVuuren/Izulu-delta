@@ -3,11 +3,13 @@ import React from 'react';
 
 const CompanyBadge = () => {
   return (
-    <div className="flex items-center">
+    <div className="flex items-center justify-center">
+      {/* IZULU text on the left */}
       <div className="mr-4">
         <h2 className="text-3xl font-bold">IZULU</h2>
-        <h3 className="text-2xl font-bold">DELTA</h3>
       </div>
+      
+      {/* Central character image in diamond/circle */}
       <div className="relative w-24 h-24">
         {/* Circle */}
         <div className="absolute top-0 left-0 w-full h-full border-2 border-white/20 rounded-full"></div>
@@ -23,6 +25,11 @@ const CompanyBadge = () => {
             />
           </div>
         </div>
+      </div>
+      
+      {/* DELTA text on the right */}
+      <div className="ml-4">
+        <h3 className="text-3xl font-bold">DELTA</h3>
       </div>
     </div>
   );
