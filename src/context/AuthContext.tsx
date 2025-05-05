@@ -26,8 +26,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (username: string, password: string) => {
-    // Hardcoded credentials for demo
-    if (username === 'jaco' && password === 'jaco1029') {
+    // Updated credentials
+    if (username === 'SKA311772' && password === 'CSUkqt358003') {
       setIsAuthenticated(true);
       setUser(username);
       localStorage.setItem('auth', 'true');
