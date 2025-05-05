@@ -23,7 +23,7 @@ const MonthSelector = ({ selectedMonth, setSelectedMonth }: MonthSelectorProps) 
   };
 
   return (
-    <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+    <div className="flex items-center justify-start border-b border-white/10 pb-4 mb-6">
       <Button variant="ghost" size="sm" onClick={handlePreviousMonth}>
         <ChevronLeft className="h-4 w-4 mr-1" />
       </Button>

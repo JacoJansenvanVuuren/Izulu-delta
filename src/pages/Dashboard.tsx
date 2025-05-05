@@ -14,26 +14,41 @@ const generateMockData = (month: number) => {
     {
       id: '1',
       name: 'Acme Corporation',
-      policiesProducts: 3 + month,
-      pdfSchedules: 'Schedule-AC-2024',
-      pdfDocs: 'DOC-AC-001',
+      policiesCount: 3 + month,
+      products: 'Life Insurance, Health Insurance',
+      scheduleDocsUrl: 'mock-url-for-schedule-ac-2024.pdf',
+      pdfDocsUrl: 'mock-url-for-doc-ac-001.pdf',
       policyNumbers: 'PLY-2024-001',
+      issueDate: '2024-01-15',
+      deductionDate: '2024-02-01',
+      loaDocUrl: 'mock-url-for-loa-ac-001.pdf',
+      policyPremium: '$1,500',
     },
     {
       id: '2',
       name: 'TechNova Solutions',
-      policiesProducts: 2 + (month % 5),
-      pdfSchedules: 'Schedule-TN-2024',
-      pdfDocs: 'DOC-TN-002',
+      policiesCount: 2 + (month % 5),
+      products: 'Health Insurance, Property Insurance',
+      scheduleDocsUrl: 'mock-url-for-schedule-tn-2024.pdf',
+      pdfDocsUrl: 'mock-url-for-doc-tn-002.pdf',
       policyNumbers: 'PLY-2024-002',
+      issueDate: '2024-02-10',
+      deductionDate: '2024-03-01',
+      loaDocUrl: 'mock-url-for-loa-tn-002.pdf',
+      policyPremium: '$2,200',
     },
     {
       id: '3',
       name: 'Global Industries',
-      policiesProducts: 5 - (month % 3),
-      pdfSchedules: 'Schedule-GI-2024',
-      pdfDocs: 'DOC-GI-003',
+      policiesCount: 5 - (month % 3),
+      products: 'Vehicle Insurance, Business Liability',
+      scheduleDocsUrl: 'mock-url-for-schedule-gi-2024.pdf',
+      pdfDocsUrl: 'mock-url-for-doc-gi-003.pdf',
       policyNumbers: 'PLY-2024-003',
+      issueDate: '2024-03-05',
+      deductionDate: '2024-04-01',
+      loaDocUrl: 'mock-url-for-loa-gi-003.pdf',
+      policyPremium: '$3,750',
     },
   ];
   
@@ -42,10 +57,15 @@ const generateMockData = (month: number) => {
     baseClients.push({
       id: '4',
       name: 'Marine Enterprises',
-      policiesProducts: 4,
-      pdfSchedules: 'Schedule-ME-2024',
-      pdfDocs: 'DOC-ME-004',
+      policiesCount: 4,
+      products: 'Marine Insurance, Property Insurance',
+      scheduleDocsUrl: 'mock-url-for-schedule-me-2024.pdf',
+      pdfDocsUrl: 'mock-url-for-doc-me-004.pdf',
       policyNumbers: 'PLY-2024-004',
+      issueDate: '2024-01-20',
+      deductionDate: '2024-02-15',
+      loaDocUrl: 'mock-url-for-loa-me-004.pdf',
+      policyPremium: '$4,300',
     });
   }
   
@@ -53,10 +73,15 @@ const generateMockData = (month: number) => {
     baseClients.push({
       id: '5',
       name: 'Delta Shipping',
-      policiesProducts: 2,
-      pdfSchedules: 'Schedule-DS-2024',
-      pdfDocs: 'DOC-DS-005',
+      policiesCount: 2,
+      products: 'Cargo Insurance, Liability Insurance',
+      scheduleDocsUrl: 'mock-url-for-schedule-ds-2024.pdf',
+      pdfDocsUrl: 'mock-url-for-doc-ds-005.pdf',
       policyNumbers: 'PLY-2024-005',
+      issueDate: '2024-02-25',
+      deductionDate: '2024-03-15',
+      loaDocUrl: 'mock-url-for-loa-ds-005.pdf',
+      policyPremium: '$2,900',
     });
   }
   
@@ -91,7 +116,7 @@ const Dashboard = () => {
           setSelectedMonth={setSelectedMonth}
         />
         
-        <ClientTable clients={clients} />
+        <ClientTable initialClients={clients} />
       </div>
     </div>
   );
