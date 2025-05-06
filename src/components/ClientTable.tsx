@@ -30,7 +30,7 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
   // Convert string products and policyNumbers to arrays for existing clients
   const formattedInitialClients = initialClients.map(client => ({
     ...client,
-    products: Array.isArray(client.products) ? client.products : client.products.split(', '),
+    products: Array.isArray(client.products) ? client.products : (typeof client.products === 'string' ? client.products.split(', ') : []),
     policyNumbers: Array.isArray(client.policyNumbers) ? client.policyNumbers : [client.policyNumbers],
     scheduleDocsUrl: Array.isArray(client.scheduleDocsUrl) ? client.scheduleDocsUrl : client.scheduleDocsUrl ? [client.scheduleDocsUrl] : [],
     pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
@@ -134,7 +134,7 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
               <TableHead className="text-left font-medium">Issue date</TableHead>
               <TableHead className="text-left font-medium">Deduction date</TableHead>
               <TableHead className="text-left font-medium">LOA and cancellation</TableHead>
-              <TableHead className="text-left font-medium">Policy premium</TableHead>
+              <TableHead className="text-left font-medium w-32">Policy premium</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -212,7 +212,7 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
                   <Input 
                     value={client.policyPremium} 
                     onChange={(e) => updateClientField(client.id, 'policyPremium', e.target.value)}
-                    className="bg-transparent border-white/10" 
+                    className="bg-transparent border-white/10 w-full min-w-[130px]" 
                   />
                 </TableCell>
               </TableRow>
