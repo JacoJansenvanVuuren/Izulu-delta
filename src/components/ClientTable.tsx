@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus, Trash2, Search, FileText, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle, Calendar } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Client {
@@ -38,11 +38,11 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
   }));
 
-  const [clients, setClients] = useState<Client[]>(formattedInitialClients);
-  
+  // Use clients directly from props; all state is managed by parent for per-month isolation
+  const clients = formattedInitialClients;
+
   // Update parent component when clients change
   const updateClients = (updatedClients: Client[]) => {
-    setClients(updatedClients);
     if (onClientsChange) {
       onClientsChange(updatedClients);
     }
@@ -165,7 +165,8 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
         </div>
       </div>
       
-      <div className="glass-morphism rounded-lg overflow-hidden">
+      {/* Desktop Table View */}
+      <div className="glass-morphism rounded-lg overflow-hidden hidden sm:block">
         <Table>
           <TableHeader className="bg-black/30">
             <TableRow>
@@ -314,6 +315,70 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="block sm:hidden space-y-4">
+        {filteredClients.map((client) => (
+          <div key={client.id} className="glass-morphism rounded-lg p-4 flex flex-col gap-3 shadow-md">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-semibold text-lg">{client.name || <span className="text-muted-foreground">Unnamed Client</span>}</span>
+              <Button size="icon" variant="ghost" onClick={() => removeClient(client.id)} className="text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="block text-xs text-muted-foreground">Policies</span>
+                <Input type="number" value={client.policiesCount} onChange={(e) => updateClientField(client.id, 'policiesCount', parseInt(e.target.value) || 0)} className="w-full mt-1" />
+              </div>
+              <div>
+                <span className="block text-xs text-muted-foreground">Premium</span>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2">R</span>
+                  <Input value={client.policyPremium.replace(/^[$R]/, '')} onChange={(e) => updateClientField(client.id, 'policyPremium', e.target.value)} className="pl-7 w-full" />
+                </div>
+              </div>
+              <div className="col-span-2">
+                <span className="block text-xs text-muted-foreground">Products</span>
+                <MultiEntryField values={client.products} onChange={(values) => updateMultiEntryField(client.id, 'products', values)} placeholder="Add a product" />
+              </div>
+              <div className="col-span-2">
+                <span className="block text-xs text-muted-foreground">Policy Numbers</span>
+                <MultiEntryField values={client.policyNumbers} onChange={(values) => updateMultiEntryField(client.id, 'policyNumbers', values)} placeholder="Add a policy number" />
+              </div>
+              <div>
+                <span className="block text-xs text-muted-foreground">Issue Date</span>
+                <Input type="date" value={client.issueDate} onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)} className="w-full mt-1" />
+              </div>
+              <div>
+                <span className="block text-xs text-muted-foreground">Deduction Date</span>
+                <Input type="date" value={client.deductionDate} onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)} className="w-full mt-1" />
+              </div>
+              <div className="col-span-2">
+                <span className="block text-xs text-muted-foreground">Schedule Docs</span>
+                <MultiFileUpload onFileUpload={(file) => handleMultiFileUpload(client.id, 'scheduleDocsUrl', file)} files={client.scheduleDocsUrl || []} onRemove={(index) => removeFile(client.id, 'scheduleDocsUrl', index)} label="Schedule Documents" />
+              </div>
+              <div className="col-span-2">
+                <span className="block text-xs text-muted-foreground">PDF Docs</span>
+                <MultiFileUpload onFileUpload={(file) => handleMultiFileUpload(client.id, 'pdfDocsUrl', file)} files={client.pdfDocsUrl || []} onRemove={(index) => removeFile(client.id, 'pdfDocsUrl', index)} label="PDF Documents" />
+              </div>
+              <div className="col-span-2">
+                <span className="block text-xs text-muted-foreground">LOA & Cancellation</span>
+                <FileUpload onFileUpload={(file) => handleFileUpload(client.id, 'loaDocUrl', file)} label="LOA and Cancellation Letter" fileUrl={client.loaDocUrl} />
+              </div>
+            </div>
+          </div>
+        ))}
+        {filteredClients.length === 0 && (
+          <div className="glass-morphism rounded-lg p-8 flex flex-col items-center justify-center text-center gap-4">
+            <FileText className="h-8 w-8 mb-2 text-muted-foreground/50" />
+            <p>No client data available for this month</p>
+            <Button variant="link" onClick={addNewClient} className="w-full">
+              Add your first client
+            </Button>
+          </div>
+        )}
       </div>
 
     </div>
