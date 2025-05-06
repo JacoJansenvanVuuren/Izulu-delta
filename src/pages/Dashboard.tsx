@@ -7,18 +7,33 @@ import MonthSelector from '@/components/MonthSelector';
 import UserProfile from '@/components/UserProfile';
 import CompanyBadge from '@/components/CompanyBadge';
 
+// Define Client interface (matching the one in ClientTable.tsx)
+interface Client {
+  id: string;
+  name: string;
+  policiesCount: number;
+  products: string[];
+  scheduleDocsUrl?: string[];
+  pdfDocsUrl?: string[];
+  policyNumbers: string[];
+  issueDate: string;
+  deductionDate: string;
+  loaDocUrl?: string;
+  policyPremium: string;
+}
+
 // Mock client data for each month
-const generateMockData = (month: number) => {
+const generateMockData = (month: number): Client[] => {
   // Generate different data for each month
-  const baseClients = [
+  const baseClients: Client[] = [
     {
       id: '1',
       name: 'Acme Corporation',
       policiesCount: 3 + month,
-      products: 'Life Insurance, Health Insurance',
-      scheduleDocsUrl: 'mock-url-for-schedule-ac-2024.pdf',
-      pdfDocsUrl: 'mock-url-for-doc-ac-001.pdf',
-      policyNumbers: 'PLY-2024-001',
+      products: ['Life Insurance', 'Health Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-ac-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-ac-001.pdf'],
+      policyNumbers: ['PLY-2024-001'],
       issueDate: '2024-01-15',
       deductionDate: '2024-02-01',
       loaDocUrl: 'mock-url-for-loa-ac-001.pdf',
@@ -28,10 +43,10 @@ const generateMockData = (month: number) => {
       id: '2',
       name: 'TechNova Solutions',
       policiesCount: 2 + (month % 5),
-      products: 'Health Insurance, Property Insurance',
-      scheduleDocsUrl: 'mock-url-for-schedule-tn-2024.pdf',
-      pdfDocsUrl: 'mock-url-for-doc-tn-002.pdf',
-      policyNumbers: 'PLY-2024-002',
+      products: ['Health Insurance', 'Property Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-tn-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-tn-002.pdf'],
+      policyNumbers: ['PLY-2024-002'],
       issueDate: '2024-02-10',
       deductionDate: '2024-03-01',
       loaDocUrl: 'mock-url-for-loa-tn-002.pdf',
@@ -41,10 +56,10 @@ const generateMockData = (month: number) => {
       id: '3',
       name: 'Global Industries',
       policiesCount: 5 - (month % 3),
-      products: 'Vehicle Insurance, Business Liability',
-      scheduleDocsUrl: 'mock-url-for-schedule-gi-2024.pdf',
-      pdfDocsUrl: 'mock-url-for-doc-gi-003.pdf',
-      policyNumbers: 'PLY-2024-003',
+      products: ['Vehicle Insurance', 'Business Liability'],
+      scheduleDocsUrl: ['mock-url-for-schedule-gi-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-gi-003.pdf'],
+      policyNumbers: ['PLY-2024-003'],
       issueDate: '2024-03-05',
       deductionDate: '2024-04-01',
       loaDocUrl: 'mock-url-for-loa-gi-003.pdf',
@@ -58,10 +73,10 @@ const generateMockData = (month: number) => {
       id: '4',
       name: 'Marine Enterprises',
       policiesCount: 4,
-      products: 'Marine Insurance, Property Insurance',
-      scheduleDocsUrl: 'mock-url-for-schedule-me-2024.pdf',
-      pdfDocsUrl: 'mock-url-for-doc-me-004.pdf',
-      policyNumbers: 'PLY-2024-004',
+      products: ['Marine Insurance', 'Property Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-me-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-me-004.pdf'],
+      policyNumbers: ['PLY-2024-004'],
       issueDate: '2024-01-20',
       deductionDate: '2024-02-15',
       loaDocUrl: 'mock-url-for-loa-me-004.pdf',
@@ -74,10 +89,10 @@ const generateMockData = (month: number) => {
       id: '5',
       name: 'Delta Shipping',
       policiesCount: 2,
-      products: 'Cargo Insurance, Liability Insurance',
-      scheduleDocsUrl: 'mock-url-for-schedule-ds-2024.pdf',
-      pdfDocsUrl: 'mock-url-for-doc-ds-005.pdf',
-      policyNumbers: 'PLY-2024-005',
+      products: ['Cargo Insurance', 'Liability Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-ds-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-ds-005.pdf'],
+      policyNumbers: ['PLY-2024-005'],
       issueDate: '2024-02-25',
       deductionDate: '2024-03-15',
       loaDocUrl: 'mock-url-for-loa-ds-005.pdf',
@@ -91,32 +106,83 @@ const generateMockData = (month: number) => {
 const Dashboard = () => {
   const { isAuthenticated } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [clients, setClients] = useState(generateMockData(selectedMonth));
+  // Store clients for each month separately
+  const [clientsByMonth, setClientsByMonth] = useState<Record<number, Client[]>>(() => {
+    // Initialize with data for all months
+    const initialData: Record<number, Client[]> = {};
+    for (let i = 0; i < 12; i++) {
+      initialData[i] = generateMockData(i);
+    }
+    return initialData;
+  });
 
-  useEffect(() => {
-    setClients(generateMockData(selectedMonth));
-  }, [selectedMonth]);
+  // Get current month's clients
+  const clients = clientsByMonth[selectedMonth] || [];
+
+  // Update clients for the current month only
+  const updateClientsForCurrentMonth = (updatedClients: Client[]) => {
+    setClientsByMonth(prev => ({
+      ...prev,
+      [selectedMonth]: updatedClients
+    }));
+  };
 
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-gradient-to-b from-background to-black/80 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <UserProfile />
-          <div className="flex justify-end">
-            <CompanyBadge />
+        {/* Header with improved layout */}
+        <div className="glass-morphism rounded-lg p-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <UserProfile />
+            <div className="flex justify-end items-center">
+              <CompanyBadge />
+            </div>
           </div>
         </div>
         
-        <MonthSelector
-          selectedMonth={selectedMonth}
-          setSelectedMonth={setSelectedMonth}
-        />
+        {/* Dashboard title and month selector in one row */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gradient mb-4 md:mb-0">Monthly Tracking</h1>
+          <MonthSelector
+            selectedMonth={selectedMonth}
+            setSelectedMonth={setSelectedMonth}
+          />
+        </div>
         
-        <ClientTable initialClients={clients} />
+        {/* Stats cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="glass-morphism rounded-lg p-4">
+            <h3 className="text-muted-foreground text-sm mb-1">Total Clients</h3>
+            <p className="text-2xl font-bold">{clients.length}</p>
+          </div>
+          <div className="glass-morphism rounded-lg p-4">
+            <h3 className="text-muted-foreground text-sm mb-1">Total Policies</h3>
+            <p className="text-2xl font-bold">{clients.reduce((sum, client) => sum + client.policiesCount, 0)}</p>
+          </div>
+          <div className="glass-morphism rounded-lg p-4">
+            <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
+            <p className="text-2xl font-bold">R{clients.reduce((sum, client) => {
+              const premium = client.policyPremium.replace(/[^0-9.]/g, '');
+              return sum + (parseFloat(premium) || 0);
+            }, 0).toLocaleString()}</p>
+          </div>
+          <div className="glass-morphism rounded-lg p-4">
+            <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
+            <p className="text-2xl font-bold">{new Set(clients.flatMap(client => 
+              Array.isArray(client.products) ? client.products : []
+            )).size}</p>
+          </div>
+        </div>
+        
+        {/* Client table with improved styling */}
+        <ClientTable 
+          initialClients={clients} 
+          onClientsChange={updateClientsForCurrentMonth} 
+        />
       </div>
     </div>
   );

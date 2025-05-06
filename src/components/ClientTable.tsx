@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Client {
   id: string;
@@ -24,19 +25,42 @@ interface Client {
 
 interface ClientTableProps {
   initialClients: Client[];
+  onClientsChange?: (clients: Client[]) => void;
 }
 
-const ClientTable = ({ initialClients }: ClientTableProps) => {
+const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   // Convert string products and policyNumbers to arrays for existing clients
   const formattedInitialClients = initialClients.map(client => ({
     ...client,
-    products: Array.isArray(client.products) ? client.products : (typeof client.products === 'string' ? client.products.split(', ') : []),
+    products: Array.isArray(client.products) ? client.products : [],
     policyNumbers: Array.isArray(client.policyNumbers) ? client.policyNumbers : [client.policyNumbers],
     scheduleDocsUrl: Array.isArray(client.scheduleDocsUrl) ? client.scheduleDocsUrl : client.scheduleDocsUrl ? [client.scheduleDocsUrl] : [],
     pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
   }));
 
   const [clients, setClients] = useState<Client[]>(formattedInitialClients);
+  
+  // Update parent component when clients change
+  const updateClients = (updatedClients: Client[]) => {
+    setClients(updatedClients);
+    if (onClientsChange) {
+      onClientsChange(updatedClients);
+    }
+  };
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // Filter clients based on search term
+  const filteredClients = clients.filter(client => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      client.name.toLowerCase().includes(searchLower) ||
+      client.policyNumbers.some(num => num.toLowerCase().includes(searchLower)) ||
+      client.products.some(product => product.toLowerCase().includes(searchLower)) ||
+      client.policyPremium.toLowerCase().includes(searchLower)
+    );
+  });
 
   // In a real app, this would interact with your storage solution
   const handleFileUpload = (clientId: string, field: 'loaDocUrl', file: File) => {
@@ -44,52 +68,48 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
     // In a real app, you would upload to a storage provider and get a URL back
     const mockUrl = `mock-url-for-${file.name}`;
 
-    setClients(prevClients => 
-      prevClients.map(client => 
-        client.id === clientId 
-          ? { ...client, [field]: mockUrl } 
-          : client
-      )
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { ...client, [field]: mockUrl } 
+        : client
     );
+    updateClients(updatedClients);
   };
 
   const handleMultiFileUpload = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
     // Create a mock URL for this file
     const mockUrl = `mock-url-for-${file.name}`;
 
-    setClients(prevClients => 
-      prevClients.map(client => 
-        client.id === clientId 
-          ? { 
-              ...client, 
-              [field]: [...(client[field] || []), mockUrl]
-            } 
-          : client
-      )
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { 
+            ...client, 
+            [field]: [...(client[field] || []), mockUrl]
+          } 
+        : client
     );
+    updateClients(updatedClients);
   };
 
   const removeFile = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
-    setClients(prevClients => 
-      prevClients.map(client => 
-        client.id === clientId 
-          ? { 
-              ...client, 
-              [field]: client[field]?.filter((_, i) => i !== index) || [] 
-            } 
-          : client
-      )
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { 
+            ...client, 
+            [field]: client[field]?.filter((_, i) => i !== index) || [] 
+          } 
+        : client
     );
+    updateClients(updatedClients);
   };
 
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
-    setClients(prevClients => 
-      prevClients.map(client => 
-        client.id === clientId 
-          ? { ...client, [field]: values } 
-          : client
-      )
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { ...client, [field]: values } 
+        : client
     );
+    updateClients(updatedClients);
   };
 
   const addNewClient = () => {
@@ -106,26 +126,50 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
       policyPremium: '',
     };
 
-    setClients([...clients, newClient]);
+    const updatedClients = [...clients, newClient];
+    updateClients(updatedClients);
+  };
+
+  const removeClient = (clientId: string) => {
+    const updatedClients = clients.filter(client => client.id !== clientId);
+    updateClients(updatedClients);
   };
 
   const updateClientField = (clientId: string, field: keyof Client, value: string | number) => {
-    setClients(prevClients => 
-      prevClients.map(client => 
-        client.id === clientId 
-          ? { ...client, [field]: value } 
-          : client
-      )
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { ...client, [field]: value } 
+        : client
     );
+    updateClients(updatedClients);
   };
 
   return (
     <div className="space-y-4">
+      {/* Search and actions bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+        <div className="relative w-full sm:w-auto">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search clients, policies, or products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-transparent border-white/10 w-full sm:w-80 focus:w-full expandable-input"
+          />
+        </div>
+        
+        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+          <Button onClick={addNewClient} className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" /> Add New Row
+          </Button>
+        </div>
+      </div>
+      
       <div className="glass-morphism rounded-lg overflow-hidden">
         <Table>
-          <TableHeader className="bg-black/20">
+          <TableHeader className="bg-black/30">
             <TableRow>
-              <TableHead className="text-left font-medium w-48">Client Name</TableHead>
+              <TableHead className="text-left font-medium w-48 py-4">Client Name</TableHead>
               <TableHead className="text-left font-medium">Number of Policies</TableHead>
               <TableHead className="text-left font-medium w-48">Products</TableHead>
               <TableHead className="text-left font-medium">Schedule docs</TableHead>
@@ -135,10 +179,11 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
               <TableHead className="text-left font-medium">Deduction date</TableHead>
               <TableHead className="text-left font-medium">LOA and cancellation</TableHead>
               <TableHead className="text-left font-medium w-32">Policy premium</TableHead>
+              <TableHead className="text-left font-medium w-16">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.map((client) => (
+            {filteredClients.map((client) => (
               <TableRow key={client.id} className="border-t border-white/5 hover:bg-white/5">
                 <TableCell>
                   <Input 
@@ -209,30 +254,68 @@ const ClientTable = ({ initialClients }: ClientTableProps) => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Input 
-                    value={client.policyPremium} 
-                    onChange={(e) => updateClientField(client.id, 'policyPremium', e.target.value)}
-                    className="bg-transparent border-white/10 w-full min-w-[130px]" 
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2">R</span>
+                    <Input 
+                      value={client.policyPremium.replace(/^[$R]/, '')} 
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/^[$R]/, '');
+                        updateClientField(client.id, 'policyPremium', value);
+                      }}
+                      className="bg-transparent border-white/10 w-full min-w-[130px] pl-7" 
+                    />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => removeClient(client.id)} 
+                          className="text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Remove client</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableCell>
               </TableRow>
             ))}
-            {clients.length === 0 && (
+            {filteredClients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
-                  No client data available for this month
+                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center">
+                    {searchTerm ? (
+                      <>
+                        <Search className="h-8 w-8 mb-2 text-muted-foreground/50" />
+                        <p>No results found for "{searchTerm}"</p>
+                        <Button variant="link" onClick={() => setSearchTerm('')} className="mt-2">
+                          Clear search
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-8 w-8 mb-2 text-muted-foreground/50" />
+                        <p>No client data available for this month</p>
+                        <Button variant="link" onClick={addNewClient} className="mt-2">
+                          Add your first client
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      
-      <div className="flex justify-end">
-        <Button onClick={addNewClient}>
-          <Plus className="h-4 w-4 mr-2" /> Add New Client
-        </Button>
-      </div>
+
     </div>
   );
 };
