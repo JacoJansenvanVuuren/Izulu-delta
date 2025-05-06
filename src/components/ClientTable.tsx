@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface Client {
   id: string;
   name: string;
+  location: string;
   policiesCount: number;
   products: string[];
   scheduleDocsUrl?: string[];
@@ -56,6 +57,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     const searchLower = searchTerm.toLowerCase();
     return (
       client.name.toLowerCase().includes(searchLower) ||
+      client.location.toLowerCase().includes(searchLower) ||
       client.policyNumbers.some(num => num.toLowerCase().includes(searchLower)) ||
       client.products.some(product => product.toLowerCase().includes(searchLower)) ||
       client.policyPremium.toLowerCase().includes(searchLower)
@@ -116,6 +118,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     const newClient: Client = {
       id: `client-${Date.now()}`,
       name: '',
+      location: '',
       policiesCount: 0,
       products: [],
       policyNumbers: [],
@@ -171,6 +174,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           <TableHeader className="bg-black/30">
             <TableRow>
               <TableHead className="text-left font-medium w-48 py-4">Client Name</TableHead>
+              <TableHead className="text-left font-medium w-40">Location</TableHead>
               <TableHead className="text-left font-medium">Number of Policies</TableHead>
               <TableHead className="text-left font-medium w-48">Products</TableHead>
               <TableHead className="text-left font-medium">Schedule docs</TableHead>
@@ -191,6 +195,13 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
                     value={client.name} 
                     onChange={(e) => updateClientField(client.id, 'name', e.target.value)}
                     className="bg-transparent border-white/10 w-full min-w-[150px] expandable-input" 
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input 
+                    value={client.location} 
+                    onChange={(e) => updateClientField(client.id, 'location', e.target.value)}
+                    className="bg-transparent border-white/10 w-full min-w-[120px] expandable-input" 
                   />
                 </TableCell>
                 <TableCell>
