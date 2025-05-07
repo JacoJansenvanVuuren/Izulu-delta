@@ -481,7 +481,7 @@ export const saveClientData = async (clientData: ClientData, month: number, year
         deduction_date: clientData.deductionDate || null
       });
     } else {
-      // Create new policy - Fix: month and year as numbers
+      // Create new policy with month and year as numbers
       clientPolicy = await createClientPolicy({
         client_id: client.id,
         month: month,

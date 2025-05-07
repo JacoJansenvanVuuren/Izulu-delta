@@ -24,6 +24,7 @@ const Dashboard = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const currentYear = new Date().getFullYear();
 
   // Fetch client data for the selected month
   useEffect(() => {
@@ -32,7 +33,7 @@ const Dashboard = () => {
         setLoading(true);
         
         if (!clientsByMonth[selectedMonth]) {
-          const data = await getClientDataByMonth(selectedMonth);
+          const data = await getClientDataByMonth(selectedMonth, currentYear);
           setClientsByMonth(prev => ({
             ...prev,
             [selectedMonth]: data
@@ -57,7 +58,7 @@ const Dashboard = () => {
     };
     
     fetchData();
-  }, [selectedMonth, showSummary, clientsByMonth, clientSummaries.length, toast]);
+  }, [selectedMonth, showSummary, clientsByMonth, clientSummaries.length, toast, currentYear]);
 
   // Update clients for the current month only
   const updateClientsForCurrentMonth = async (updatedClients: ClientData[]) => {
@@ -74,7 +75,7 @@ const Dashboard = () => {
         // Only save if it's a new client or if data has actually changed
         if (!currentClient || JSON.stringify(currentClient) !== JSON.stringify(updatedClient)) {
           // Save client for the current month only
-          await saveClientData(updatedClient, selectedMonth);
+          await saveClientData(updatedClient, selectedMonth, currentYear);
         }
       }
       
@@ -83,7 +84,7 @@ const Dashboard = () => {
       for (const currentClient of currentClients) {
         if (!updatedClientIds.has(currentClient.id)) {
           // Delete client from the current month only
-          await deleteClientData(currentClient.id);
+          await deleteClientData(currentClient.id, selectedMonth, currentYear);
         }
       }
       

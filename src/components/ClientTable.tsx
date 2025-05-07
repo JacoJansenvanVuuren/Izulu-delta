@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -33,6 +32,12 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const { toast } = useToast();
+  
+  // Update local state when initialClients change
+  useEffect(() => {
+    setClients(formattedInitialClients);
+    setHasChanges(false);
+  }, [JSON.stringify(initialClients)]);
 
   // Update clients state without triggering parent save
   const updateClientsLocal = (updatedClients: ClientData[]) => {
@@ -131,6 +136,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     }
   };
 
+  // Remove file from multi-file uploads
   const removeFile = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
@@ -143,6 +149,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     updateClientsLocal(updatedClients);
   };
 
+  // Update multi-entry fields (products and policy numbers)
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
@@ -152,6 +159,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     updateClientsLocal(updatedClients);
   };
 
+  // Add a new empty client row
   const addNewClient = () => {
     const newClient: ClientData = {
       id: `client-temp-${Date.now()}`,
@@ -172,11 +180,13 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     updateClientsLocal(updatedClients);
   };
 
+  // Remove a client row
   const removeClient = (clientId: string) => {
     const updatedClients = clients.filter(client => client.id !== clientId);
     updateClientsLocal(updatedClients);
   };
 
+  // Update a single client field
   const updateClientField = (clientId: string, field: keyof ClientData, value: string | number) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
@@ -201,11 +211,17 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
         </div>
         
         <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-          <Button onClick={addNewClient} className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto">
+          <Button 
+            onClick={addNewClient} 
+            className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" /> Add New Row
           </Button>
           {hasChanges && (
-            <Button onClick={saveChanges} className="bg-green-600/90 hover:bg-green-700 text-white w-full sm:w-auto">
+            <Button 
+              onClick={saveChanges} 
+              className="bg-green-600/90 hover:bg-green-700 text-white w-full sm:w-auto"
+            >
               <Save className="h-4 w-4 mr-2" /> Save Changes
             </Button>
           )}
