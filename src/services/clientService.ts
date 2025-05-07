@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Client, ClientPolicy, PolicyProduct, PolicyNumber, ScheduleDoc, PdfDoc, LoaDoc, ClientData } from '@/types/clients';
 
@@ -443,7 +442,7 @@ export const saveClientData = async (clientData: ClientData, month: number, year
     let clientPolicy: ClientPolicy;
     
     // Step 1: Create or update client
-    if (clientData.id && clientData.id !== 'client-temp') {
+    if (clientData.id && !clientData.id.startsWith('client-temp')) {
       // Update existing client
       client = await updateClient(clientData.id, {
         name: clientData.name,
