@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Client, ClientPolicy, PolicyProduct, PolicyNumber, ScheduleDoc, PdfDoc, LoaDoc, ClientData } from '@/types/clients';
 
@@ -372,22 +371,27 @@ export const getClientDataByMonth = async (month: number, year: number = new Dat
     // Step 3: Create a map to build complete client data
     const clientDataMap: Record<string, ClientData> = {};
     
-    // Initialize with all clients
+    // Initialize with clients that have policies for this month only
+    const clientsWithPoliciesThisMonth = new Set(policies.map(p => p.client_id));
+    
     for (const client of clients) {
-      clientDataMap[client.id] = {
-        id: client.id,
-        name: client.name,
-        location: client.location,
-        policiesCount: 0,
-        products: [],
-        scheduleDocsUrl: [],
-        pdfDocsUrl: [],
-        policyNumbers: [],
-        issueDate: '',
-        deductionDate: '',
-        loaDocUrl: undefined,
-        policyPremium: '0',
-      };
+      // Only include clients that have policies for this month
+      if (clientsWithPoliciesThisMonth.has(client.id)) {
+        clientDataMap[client.id] = {
+          id: client.id,
+          name: client.name,
+          location: client.location,
+          policiesCount: 0,
+          products: [],
+          scheduleDocsUrl: [],
+          pdfDocsUrl: [],
+          policyNumbers: [],
+          issueDate: '',
+          deductionDate: '',
+          loaDocUrl: undefined,
+          policyPremium: '0',
+        };
+      }
     }
     
     // Process each policy
@@ -440,7 +444,6 @@ export const getClientDataByMonth = async (month: number, year: number = new Dat
 export const saveClientData = async (clientData: ClientData, month: number, year: number = new Date().getFullYear()): Promise<ClientData> => {
   try {
     let client: Client;
-    let clientPolicy: ClientPolicy;
     
     // Step 1: Create or update client
     if (clientData.id && !clientData.id.startsWith('client-temp')) {
@@ -467,6 +470,8 @@ export const saveClientData = async (clientData: ClientData, month: number, year
     
     if (existingPolicies.error) throw existingPolicies.error;
     
+    let clientPolicy: ClientPolicy;
+    
     if (existingPolicies.data && existingPolicies.data.length > 0) {
       // Update existing policy
       clientPolicy = await updateClientPolicy(existingPolicies.data[0].id, {
@@ -476,7 +481,7 @@ export const saveClientData = async (clientData: ClientData, month: number, year
         deduction_date: clientData.deductionDate || null
       });
     } else {
-      // Create new policy - Fix: Convert month and year to strings
+      // Create new policy - Fix: month and year as numbers
       clientPolicy = await createClientPolicy({
         client_id: client.id,
         month: month,
@@ -522,11 +527,29 @@ export const saveClientData = async (clientData: ClientData, month: number, year
   }
 };
 
-// Function to delete a client and all associated data
-export const deleteClientData = async (clientId: string): Promise<void> => {
+// Function to delete a client's policy for a specific month
+export const deleteClientData = async (clientId: string, month?: number, year: number = new Date().getFullYear()): Promise<void> => {
   try {
-    // Client deletion will cascade to all related records due to our DB constraints
-    await deleteClient(clientId);
+    // If month is specified, only delete the policy for that month
+    if (month !== undefined) {
+      // Get policies for the client in the specified month
+      const { data: policies } = await supabase
+        .from('client_policies')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('month', month)
+        .eq('year', year);
+      
+      // Delete each policy
+      if (policies && policies.length > 0) {
+        for (const policy of policies) {
+          await deleteClientPolicy(policy.id);
+        }
+      }
+    } else {
+      // Delete all client data if no month is specified
+      await deleteClient(clientId);
+    }
   } catch (error) {
     console.error('Error deleting client data:', error);
     throw error;

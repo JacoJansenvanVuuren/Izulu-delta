@@ -1,30 +1,16 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus, Trash2, Search, FileText, AlertCircle, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle, Calendar, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ClientData } from '@/types/clients';
 import { uploadFile } from '@/services/clientService';
 import { useToast } from '@/hooks/use-toast';
-
-interface Client {
-  id: string;
-  name: string;
-  location: string;
-  policiesCount: number;
-  products: string[];
-  scheduleDocsUrl?: string[];
-  pdfDocsUrl?: string[];
-  policyNumbers: string[];
-  issueDate: string;
-  deductionDate: string;
-  loaDocUrl?: string;
-  policyPremium: string;
-}
 
 interface ClientTableProps {
   initialClients: ClientData[];
@@ -41,17 +27,28 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
   }));
 
-  // Use clients directly from props; all state is managed by parent for per-month isolation
+  // Local state for clients - changes won't be saved until explicitly requested
   const [clients, setClients] = useState<ClientData[]>(formattedInitialClients);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const { toast } = useToast();
 
-  // Update parent component when clients change
-  const updateClients = (updatedClients: ClientData[]) => {
+  // Update clients state without triggering parent save
+  const updateClientsLocal = (updatedClients: ClientData[]) => {
     setClients(updatedClients);
+    setHasChanges(true);
+  };
+
+  // Save changes to parent component when explicitly requested
+  const saveChanges = () => {
     if (onClientsChange) {
-      onClientsChange(updatedClients);
+      onClientsChange(clients);
+      setHasChanges(false);
+      toast({
+        title: "Saving Changes",
+        description: "Your changes are being saved"
+      });
     }
   };
   
@@ -83,7 +80,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           : client
       );
       
-      updateClients(updatedClients);
+      updateClientsLocal(updatedClients);
       toast({
         title: "Success",
         description: "Document uploaded successfully"
@@ -117,7 +114,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           : client
       );
       
-      updateClients(updatedClients);
+      updateClientsLocal(updatedClients);
       toast({
         title: "Success",
         description: "Document uploaded successfully"
@@ -143,7 +140,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           } 
         : client
     );
-    updateClients(updatedClients);
+    updateClientsLocal(updatedClients);
   };
 
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
@@ -152,7 +149,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
         ? { ...client, [field]: values } 
         : client
     );
-    updateClients(updatedClients);
+    updateClientsLocal(updatedClients);
   };
 
   const addNewClient = () => {
@@ -172,12 +169,12 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     };
 
     const updatedClients = [...clients, newClient];
-    updateClients(updatedClients);
+    updateClientsLocal(updatedClients);
   };
 
   const removeClient = (clientId: string) => {
     const updatedClients = clients.filter(client => client.id !== clientId);
-    updateClients(updatedClients);
+    updateClientsLocal(updatedClients);
   };
 
   const updateClientField = (clientId: string, field: keyof ClientData, value: string | number) => {
@@ -186,7 +183,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
         ? { ...client, [field]: value } 
         : client
     );
-    updateClients(updatedClients);
+    updateClientsLocal(updatedClients);
   };
 
   return (
@@ -207,6 +204,11 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           <Button onClick={addNewClient} className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" /> Add New Row
           </Button>
+          {hasChanges && (
+            <Button onClick={saveChanges} className="bg-green-600/90 hover:bg-green-700 text-white w-full sm:w-auto">
+              <Save className="h-4 w-4 mr-2" /> Save Changes
+            </Button>
+          )}
         </div>
       </div>
       
@@ -433,6 +435,19 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           </div>
         )}
       </div>
+      
+      {hasChanges && (
+        <div className="fixed bottom-6 right-6">
+          <Button 
+            onClick={saveChanges} 
+            className="bg-green-600/90 hover:bg-green-700 text-white shadow-lg flex items-center gap-2 px-4 py-2"
+            size="lg"
+          >
+            <Save className="h-4 w-4" /> 
+            Save Changes
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

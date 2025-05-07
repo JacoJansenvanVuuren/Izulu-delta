@@ -57,41 +57,43 @@ const Dashboard = () => {
     };
     
     fetchData();
-  }, [selectedMonth, showSummary, clientSummaries.length, toast]);
+  }, [selectedMonth, showSummary, clientsByMonth, clientSummaries.length, toast]);
 
-  // Update clients for the current month
+  // Update clients for the current month only
   const updateClientsForCurrentMonth = async (updatedClients: ClientData[]) => {
     try {
       // Get current clients to compare
       const currentClients = clientsByMonth[selectedMonth] || [];
+      const updatedClientsMap = new Map(updatedClients.map(client => [client.id, client]));
+      const currentClientsMap = new Map(currentClients.map(client => [client.id, client]));
       
-      // Find clients to add, update, or remove
+      // Find clients to add or update
       for (const updatedClient of updatedClients) {
-        // Check if this is a new client or update
-        const existingClient = currentClients.find(c => c.id === updatedClient.id);
+        const currentClient = currentClientsMap.get(updatedClient.id);
         
-        if (!existingClient || JSON.stringify(existingClient) !== JSON.stringify(updatedClient)) {
-          // Save new or updated client
+        // Only save if it's a new client or if data has actually changed
+        if (!currentClient || JSON.stringify(currentClient) !== JSON.stringify(updatedClient)) {
+          // Save client for the current month only
           await saveClientData(updatedClient, selectedMonth);
         }
       }
       
-      // Find clients to delete
+      // Find clients to delete (in current month's data but not in updated data)
       const updatedClientIds = new Set(updatedClients.map(c => c.id));
       for (const currentClient of currentClients) {
         if (!updatedClientIds.has(currentClient.id)) {
-          // Delete client
+          // Delete client from the current month only
           await deleteClientData(currentClient.id);
         }
       }
       
-      // Update state with the new client list
+      // Update state with the new client list for the current month only
       setClientsByMonth(prev => ({
         ...prev,
         [selectedMonth]: updatedClients
       }));
       
-      // If showing summary, refresh it
+      // If showing summary, refresh it to reflect the latest changes
       if (showSummary) {
         const summaries = await getClientSummaries();
         setClientSummaries(summaries);
