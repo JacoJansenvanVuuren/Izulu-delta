@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Client, ClientPolicy, PolicyProduct, PolicyNumber, ScheduleDoc, PdfDoc, LoaDoc, ClientData } from '@/types/clients';
 
@@ -475,11 +476,11 @@ export const saveClientData = async (clientData: ClientData, month: number, year
         deduction_date: clientData.deductionDate || null
       });
     } else {
-      // Create new policy
+      // Create new policy - Fix: Convert month and year to strings
       clientPolicy = await createClientPolicy({
         client_id: client.id,
-        month,
-        year,
+        month: month,
+        year: year,
         policies_count: clientData.policiesCount,
         policy_premium: parseFloat(clientData.policyPremium.replace(/[^0-9.]/g, '')),
         issue_date: clientData.issueDate || null,
