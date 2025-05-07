@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileUp, X } from 'lucide-react';
+import { uploadFile } from '@/services/clientService';
+import { useToast } from '@/hooks/use-toast';
 
 interface MultiFileUploadProps {
   onFileUpload: (file: File) => void;
@@ -15,6 +17,8 @@ interface MultiFileUploadProps {
 const MultiFileUpload = ({ onFileUpload, files, onRemove, label }: MultiFileUploadProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -22,16 +26,40 @@ const MultiFileUpload = ({ onFileUpload, files, onRemove, label }: MultiFileUplo
       if (file.type === 'application/pdf') {
         setSelectedFile(file);
       } else {
-        alert('Please upload a PDF file');
+        toast({
+          title: 'Invalid File',
+          description: 'Please upload a PDF file',
+          variant: 'destructive'
+        });
       }
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (selectedFile) {
-      onFileUpload(selectedFile);
-      setIsDialogOpen(false);
-      setSelectedFile(null);
+      try {
+        setIsUploading(true);
+        
+        // Let the parent know about the file
+        onFileUpload(selectedFile);
+        
+        setIsDialogOpen(false);
+        setSelectedFile(null);
+        
+        toast({
+          title: 'Success',
+          description: 'File uploaded successfully',
+        });
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to upload file',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -92,10 +120,10 @@ const MultiFileUpload = ({ onFileUpload, files, onRemove, label }: MultiFileUplo
             
             <Button
               type="button"
-              disabled={!selectedFile}
+              disabled={!selectedFile || isUploading}
               onClick={handleUpload}
             >
-              Upload File
+              {isUploading ? 'Uploading...' : 'Upload File'}
             </Button>
           </div>
         </DialogContent>

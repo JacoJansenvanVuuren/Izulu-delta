@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,9 @@ import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
 import { Plus, Trash2, Search, FileText, AlertCircle, Calendar } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ClientData } from '@/types/clients';
+import { uploadFile } from '@/services/clientService';
+import { useToast } from '@/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -25,8 +27,8 @@ interface Client {
 }
 
 interface ClientTableProps {
-  initialClients: Client[];
-  onClientsChange?: (clients: Client[]) => void;
+  initialClients: ClientData[];
+  onClientsChange?: (clients: ClientData[]) => void;
 }
 
 const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
@@ -40,15 +42,18 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   }));
 
   // Use clients directly from props; all state is managed by parent for per-month isolation
-  const clients = formattedInitialClients;
+  const [clients, setClients] = useState<ClientData[]>(formattedInitialClients);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
 
   // Update parent component when clients change
-  const updateClients = (updatedClients: Client[]) => {
+  const updateClients = (updatedClients: ClientData[]) => {
+    setClients(updatedClients);
     if (onClientsChange) {
       onClientsChange(updatedClients);
     }
   };
-  const [searchTerm, setSearchTerm] = useState<string>('');
   
   // Filter clients based on search term
   const filteredClients = clients.filter(client => {
@@ -64,33 +69,69 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     );
   });
 
-  // In a real app, this would interact with your storage solution
-  const handleFileUpload = (clientId: string, field: 'loaDocUrl', file: File) => {
-    // This is a mock implementation since we can't actually upload files without a backend
-    // In a real app, you would upload to a storage provider and get a URL back
-    const mockUrl = `mock-url-for-${file.name}`;
-
-    const updatedClients = clients.map(client => 
-      client.id === clientId 
-        ? { ...client, [field]: mockUrl } 
-        : client
-    );
-    updateClients(updatedClients);
+  // Handle file upload for LOA documents
+  const handleFileUpload = async (clientId: string, field: 'loaDocUrl', file: File) => {
+    try {
+      setIsUploading(true);
+      
+      // Upload to Supabase storage
+      const fileUrl = await uploadFile(file);
+      
+      const updatedClients = clients.map(client => 
+        client.id === clientId 
+          ? { ...client, [field]: fileUrl } 
+          : client
+      );
+      
+      updateClients(updatedClients);
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully"
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload document",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const handleMultiFileUpload = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
-    // Create a mock URL for this file
-    const mockUrl = `mock-url-for-${file.name}`;
+  // Handle multi-file uploads (scheduleDocsUrl, pdfDocsUrl)
+  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
+    try {
+      setIsUploading(true);
+      
+      // Upload to Supabase storage
+      const fileUrl = await uploadFile(file);
 
-    const updatedClients = clients.map(client => 
-      client.id === clientId 
-        ? { 
-            ...client, 
-            [field]: [...(client[field] || []), mockUrl]
-          } 
-        : client
-    );
-    updateClients(updatedClients);
+      const updatedClients = clients.map(client => 
+        client.id === clientId 
+          ? { 
+              ...client, 
+              [field]: [...(client[field] || []), fileUrl]
+            } 
+          : client
+      );
+      
+      updateClients(updatedClients);
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully"
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload document",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const removeFile = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
@@ -115,8 +156,8 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   };
 
   const addNewClient = () => {
-    const newClient: Client = {
-      id: `client-${Date.now()}`,
+    const newClient: ClientData = {
+      id: `client-temp-${Date.now()}`,
       name: '',
       location: '',
       policiesCount: 0,
@@ -126,7 +167,8 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
       pdfDocsUrl: [],
       issueDate: '',
       deductionDate: '',
-      policyPremium: '',
+      loaDocUrl: undefined,
+      policyPremium: '0',
     };
 
     const updatedClients = [...clients, newClient];
@@ -138,7 +180,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     updateClients(updatedClients);
   };
 
-  const updateClientField = (clientId: string, field: keyof Client, value: string | number) => {
+  const updateClientField = (clientId: string, field: keyof ClientData, value: string | number) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: value } 
@@ -391,7 +433,6 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           </div>
         )}
       </div>
-
     </div>
   );
 };

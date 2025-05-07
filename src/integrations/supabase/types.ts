@@ -9,7 +9,219 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      client_policies: {
+        Row: {
+          client_id: string
+          created_at: string
+          deduction_date: string | null
+          id: string
+          issue_date: string | null
+          month: number
+          policies_count: number
+          policy_premium: number
+          year: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          deduction_date?: string | null
+          id?: string
+          issue_date?: string | null
+          month: number
+          policies_count?: number
+          policy_premium?: number
+          year: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          deduction_date?: string | null
+          id?: string
+          issue_date?: string | null
+          month?: number
+          policies_count?: number
+          policy_premium?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_policies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string
+          id: string
+          location: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      loa_docs: {
+        Row: {
+          file_name: string
+          file_path: string
+          id: string
+          policy_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          id?: string
+          policy_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          id?: string
+          policy_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loa_docs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "client_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdf_docs: {
+        Row: {
+          file_name: string
+          file_path: string
+          id: string
+          policy_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          id?: string
+          policy_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          id?: string
+          policy_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_docs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "client_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      policy_numbers: {
+        Row: {
+          id: string
+          policy_id: string
+          policy_number: string
+        }
+        Insert: {
+          id?: string
+          policy_id: string
+          policy_number: string
+        }
+        Update: {
+          id?: string
+          policy_id?: string
+          policy_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_numbers_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "client_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      policy_products: {
+        Row: {
+          id: string
+          policy_id: string
+          product: string
+        }
+        Insert: {
+          id?: string
+          policy_id: string
+          product: string
+        }
+        Update: {
+          id?: string
+          policy_id?: string
+          product?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_products_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "client_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_docs: {
+        Row: {
+          file_name: string
+          file_path: string
+          id: string
+          policy_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          id?: string
+          policy_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          id?: string
+          policy_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_docs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "client_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

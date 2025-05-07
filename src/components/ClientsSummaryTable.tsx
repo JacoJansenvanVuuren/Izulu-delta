@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -32,6 +33,15 @@ const ClientsSummaryTable: React.FC<ClientsSummaryTableProps> = ({ summaries }) 
             <TableCell>R{client.totalPremium.toLocaleString()}</TableCell>
           </TableRow>
         ))}
+        {summaries.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+              <div className="flex flex-col items-center justify-center">
+                <p>No client summary data available</p>
+              </div>
+            </TableCell>
+          </TableRow>
+        )}
       </TableBody>
     </Table>
   </div>

@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FileUp } from 'lucide-react';
+import { uploadFile } from '@/services/clientService';
+import { useToast } from '@/hooks/use-toast';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -13,6 +15,8 @@ interface FileUploadProps {
 const FileUpload = ({ onFileUpload, label, fileUrl }: FileUploadProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -20,16 +24,40 @@ const FileUpload = ({ onFileUpload, label, fileUrl }: FileUploadProps) => {
       if (file.type === 'application/pdf') {
         setSelectedFile(file);
       } else {
-        alert('Please upload a PDF file');
+        toast({
+          title: 'Invalid File',
+          description: 'Please upload a PDF file',
+          variant: 'destructive'
+        });
       }
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (selectedFile) {
-      onFileUpload(selectedFile);
-      setIsDialogOpen(false);
-      setSelectedFile(null);
+      try {
+        setIsUploading(true);
+        
+        // Let the parent know about the file
+        onFileUpload(selectedFile);
+        
+        setIsDialogOpen(false);
+        setSelectedFile(null);
+        
+        toast({
+          title: 'Success',
+          description: 'File uploaded successfully',
+        });
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to upload file',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -81,10 +109,10 @@ const FileUpload = ({ onFileUpload, label, fileUrl }: FileUploadProps) => {
           
           <Button
             type="button"
-            disabled={!selectedFile}
+            disabled={!selectedFile || isUploading}
             onClick={handleUpload}
           >
-            {fileUrl ? 'Replace File' : 'Upload File'}
+            {isUploading ? 'Uploading...' : (fileUrl ? 'Replace File' : 'Upload File')}
           </Button>
         </div>
       </DialogContent>
