@@ -1,13 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
 import ClientTable from '@/components/ClientTable';
 import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
 import ClientSummaryButton from '@/components/ClientSummaryButton';
 import MonthSelector from '@/components/MonthSelector';
 import UserProfile from '@/components/UserProfile';
 import CompanyBadge from '@/components/CompanyBadge';
+import { 
+  fetchMonthlyClients, 
+  addMonthlyClient, 
+  updateMonthlyClient, 
+  deleteMonthlyClient 
+} from '../utils/supabaseDashboard';
 
 // Define Client interface (matching the one in ClientTable.tsx)
 interface Client {
@@ -25,115 +28,27 @@ interface Client {
   policyPremium: string;
 }
 
-// Mock client data for each month
-const generateMockData = (month: number): Client[] => {
-  // Generate different data for each month
-  const baseClients: Client[] = [
-    {
-      id: '1',
-      name: 'Acme Corporation',
-      location: 'New York',
-      policiesCount: 3 + month,
-      products: ['Life Insurance', 'Health Insurance'],
-      scheduleDocsUrl: ['mock-url-for-schedule-ac-2024.pdf'],
-      pdfDocsUrl: ['mock-url-for-doc-ac-001.pdf'],
-      policyNumbers: ['PLY-2024-001'],
-      issueDate: '2024-01-15',
-      deductionDate: '2024-02-01',
-      loaDocUrl: 'mock-url-for-loa-ac-001.pdf',
-      policyPremium: '$1,500',
-    },
-    {
-      id: '2',
-      name: 'TechNova Solutions',
-      location: 'San Francisco',
-      policiesCount: 2 + (month % 5),
-      products: ['Health Insurance', 'Property Insurance'],
-      scheduleDocsUrl: ['mock-url-for-schedule-tn-2024.pdf'],
-      pdfDocsUrl: ['mock-url-for-doc-tn-002.pdf'],
-      policyNumbers: ['PLY-2024-002'],
-      issueDate: '2024-02-10',
-      deductionDate: '2024-03-01',
-      loaDocUrl: 'mock-url-for-loa-tn-002.pdf',
-      policyPremium: '$2,200',
-    },
-    {
-      id: '3',
-      name: 'Global Industries',
-      location: 'London',
-      policiesCount: 5 - (month % 3),
-      products: ['Vehicle Insurance', 'Business Liability'],
-      scheduleDocsUrl: ['mock-url-for-schedule-gi-2024.pdf'],
-      pdfDocsUrl: ['mock-url-for-doc-gi-003.pdf'],
-      policyNumbers: ['PLY-2024-003'],
-      issueDate: '2024-03-05',
-      deductionDate: '2024-04-01',
-      loaDocUrl: 'mock-url-for-loa-gi-003.pdf',
-      policyPremium: '$3,750',
-    },
-  ];
-  
-  // Add or remove clients based on month to simulate different data
-  if (month % 3 === 0) {
-    baseClients.push({
-      id: '4',
-      name: 'Marine Enterprises',
-      location: 'Cape Town',
-      policiesCount: 4,
-      products: ['Marine Insurance', 'Property Insurance'],
-      scheduleDocsUrl: ['mock-url-for-schedule-me-2024.pdf'],
-      pdfDocsUrl: ['mock-url-for-doc-me-004.pdf'],
-      policyNumbers: ['PLY-2024-004'],
-      issueDate: '2024-01-20',
-      deductionDate: '2024-02-15',
-      loaDocUrl: 'mock-url-for-loa-me-004.pdf',
-      policyPremium: '$4,300',
-    });
-  }
-  
-  if (month % 2 === 0) {
-    baseClients.push({
-      id: '5',
-      name: 'Delta Shipping',
-      location: 'Rotterdam',
-      policiesCount: 2,
-      products: ['Cargo Insurance', 'Liability Insurance'],
-      scheduleDocsUrl: ['mock-url-for-schedule-ds-2024.pdf'],
-      pdfDocsUrl: ['mock-url-for-doc-ds-005.pdf'],
-      policyNumbers: ['PLY-2024-005'],
-      issueDate: '2024-02-25',
-      deductionDate: '2024-03-15',
-      loaDocUrl: 'mock-url-for-loa-ds-005.pdf',
-      policyPremium: '$2,900',
-    });
-  }
-  
-  return baseClients;
-};
-
 const Dashboard = () => {
-  const { isAuthenticated } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  // Store clients for each month separately
-  const [clientsByMonth, setClientsByMonth] = useState<Record<number, Client[]>>(() => {
-    // Initialize with data for all months
-    const initialData: Record<number, Client[]> = {};
-    for (let i = 0; i < 12; i++) {
-      initialData[i] = generateMockData(i);
-    }
-    return initialData;
-  });
-
-  // Get current month's clients
-  const clients = clientsByMonth[selectedMonth] || [];
-
-  // Toggle between dashboards
+  const currentYear = new Date().getFullYear();
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
 
-  // Aggregate all clients across months for summary
-  const allClients = Object.values(clientsByMonth).flat();
-  const summaryMap = new Map<string, ClientSummary>();
-  allClients.forEach(client => {
+  // Fetch clients for the selected month/year
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetchMonthlyClients(selectedMonth, currentYear)
+      .then(data => setClients(data))
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [selectedMonth, currentYear]);
+
+  // Summary logic (aggregate by name/location)
+  const summaryMap = new Map();
+  clients.forEach(client => {
     const key = `${client.name}||${client.location}`;
     const premium = parseFloat((client.policyPremium || '').replace(/[^0-9.]/g, '')) || 0;
     if (!summaryMap.has(key)) {
@@ -144,35 +59,26 @@ const Dashboard = () => {
         totalPremium: premium,
       });
     } else {
-      const entry = summaryMap.get(key)!;
+      const entry = summaryMap.get(key);
       entry.totalPolicies += client.policiesCount || 0;
       entry.totalPremium += premium;
     }
   });
   const clientSummaries = Array.from(summaryMap.values());
 
-  // Update clients for the current month only
-  const updateClientsForCurrentMonth = (updatedClients: Client[]) => {
-    setClientsByMonth(prev => ({
-      ...prev,
-      [selectedMonth]: updatedClients
-    }));
+  // Update clients after add/update/delete
+  const reloadClients = () => {
+    setLoading(true);
+    setError(null);
+    fetchMonthlyClients(selectedMonth, currentYear)
+      .then(data => setClients(data))
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
   };
 
-  // Remove a client by name from all months
-  const onDeleteClient = (clientName: string) => {
-    setClientsByMonth(prev => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach(month => {
-        updated[month] = updated[month].filter(client => client.name !== clientName);
-      });
-      return updated;
-    });
-  };
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
+  // UI for loading and error
+  if (loading) return <div style={{padding: 40, textAlign: 'center'}}><span>Loading...</span></div>;
+  if (error) return <div style={{padding: 40, color: 'red', textAlign: 'center'}}>Error: {error}</div>;
 
   return (
     <>
@@ -222,37 +128,56 @@ const Dashboard = () => {
                 </div>
               </div>
               {/* Client table with improved styling */}
-              <ClientTable 
-                initialClients={clients} 
-                onClientsChange={updateClientsForCurrentMonth} 
+              <ClientTable
+                initialClients={clients}
+                onAddClient={async (client, cb) => {
+                  try {
+                    setLoading(true);
+                    setError(null);
+                    await addMonthlyClient(selectedMonth, currentYear, client);
+                    reloadClients();
+                    if (cb) cb();
+                  } catch (err) {
+                    setError(err.message);
+                    if (cb) cb(err);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                onUpdateClient={async (client, cb) => {
+                  try {
+                    setLoading(true);
+                    setError(null);
+                    await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
+                    reloadClients();
+                    if (cb) cb();
+                  } catch (err) {
+                    setError(err.message);
+                    if (cb) cb(err);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                onDeleteClient={async (id, cb) => {
+                  try {
+                    setLoading(true);
+                    setError(null);
+                    await deleteMonthlyClient(selectedMonth, currentYear, id);
+                    reloadClients();
+                    if (cb) cb();
+                  } catch (err) {
+                    setError(err.message);
+                    if (cb) cb(err);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
               />
             </>
           )}
           {showSummary && (
             <ClientsSummaryTable 
-              summaries={Object.values(
-                Object.values(clientsByMonth).flat().reduce((acc, client) => {
-                  if (!acc[client.name]) {
-                    acc[client.name] = {
-                      ...client,
-                      policiesCount: 0,
-                      totalPremium: 0,
-                    };
-                  }
-                  acc[client.name].policiesCount += client.policiesCount;
-                  // Sum up numeric policyPremiums for totalPremium
-                  const premium = typeof client.policyPremium === 'string' ? Number(client.policyPremium.replace(/[^\d.]/g, '')) : Number(client.policyPremium);
-                  acc[client.name].totalPremium += isNaN(premium) ? 0 : premium;
-                  if (!acc[client.name].location && client.location) acc[client.name].location = client.location;
-                  return acc;
-                }, {} as Record<string, any>)
-              ).map(client => ({
-                name: client.name,
-                location: client.location,
-                totalPolicies: client.policiesCount,
-                totalPremium: client.totalPremium,
-              }))} 
-              onDeleteClient={onDeleteClient}
+              summaries={clientSummaries}
             />
           )}
         </div>

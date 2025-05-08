@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
+import { uploadPdf } from '../utils/supabaseDashboard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -27,11 +27,12 @@ interface Client {
 
 interface ClientTableProps {
   initialClients: Client[];
-  onClientsChange?: (clients: Client[]) => void;
-  onDeleteClient?: (clientName: string) => void;
+  onAddClient?: (client: Client, cb?: (err?: string) => void) => void;
+  onUpdateClient?: (client: Client, cb?: (err?: string) => void) => void;
+  onDeleteClient?: (id: string, cb?: (err?: string) => void) => void;
 }
 
-const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: ClientTableProps) => {
+const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient }: ClientTableProps) => {
   // Convert string products and policyNumbers to arrays for existing clients
   const formattedInitialClients = initialClients.map(client => ({
     ...client,
@@ -60,18 +61,7 @@ const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: Client
     // Check if there are any changes compared to the original clients
     const changesDetected = JSON.stringify(updatedClients) !== JSON.stringify(originalClients);
     setHasChanges(changesDetected);
-
-    if (onClientsChange) {
-      onClientsChange(updatedClients);
-    }
-  }, [onClientsChange, originalClients]);
-
-  // Save changes and reset original clients
-  const saveChanges = () => {
-    setOriginalClients(currentClients);
-    setHasChanges(false);
-    // You might want to add additional save logic here, like API call
-  };
+  }, [originalClients]);
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   
@@ -89,45 +79,71 @@ const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: Client
     );
   });
 
-  // In a real app, this would interact with your storage solution
-  const handleFileUpload = (clientId: string, field: 'loaDocUrl', file: File) => {
-    // This is a mock implementation since we can't actually upload files without a backend
-    // In a real app, you would upload to a storage provider and get a URL back
-    const mockUrl = `mock-url-for-${file.name}`;
-
-    const updatedClients = currentClients.map(client => 
-      client.id === clientId 
-        ? { ...client, [field]: mockUrl } 
-        : client
-    );
-    updateClients(updatedClients);
+  // Robust Supabase PDF/file upload logic
+  const handleFileUpload = async (clientId: string, field: 'loaDocUrl', file: File) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const client = currentClients.find(c => c.id === clientId);
+      if (!client) throw new Error('Client not found');
+      const path = `${clientId}/${field}/${Date.now()}_${file.name}`;
+      const url = await uploadPdf(file, path);
+      if (onUpdateClient) {
+        onUpdateClient({ ...client, [field]: url }, (err) => {
+          setActionLoading(false);
+          if (err) setActionError(err);
+        });
+      } else {
+        setActionLoading(false);
+      }
+    } catch (err) {
+      setActionLoading(false);
+      setActionError(err.message);
+    }
   };
 
-  const handleMultiFileUpload = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
-    // Create a mock URL for this file
-    const mockUrl = `mock-url-for-${file.name}`;
-
-    const updatedClients = currentClients.map(client => 
-      client.id === clientId 
-        ? { 
-            ...client, 
-            [field]: [...(client[field] || []), mockUrl]
-          } 
-        : client
-    );
-    updateClients(updatedClients);
+  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const client = currentClients.find(c => c.id === clientId);
+      if (!client) throw new Error('Client not found');
+      const path = `${clientId}/${field}/${Date.now()}_${file.name}`;
+      const url = await uploadPdf(file, path);
+      const updatedUrls = [...(client[field] || []), url];
+      if (onUpdateClient) {
+        onUpdateClient({ ...client, [field]: updatedUrls }, (err) => {
+          setActionLoading(false);
+          if (err) setActionError(err);
+        });
+      } else {
+        setActionLoading(false);
+      }
+    } catch (err) {
+      setActionLoading(false);
+      setActionError(err.message);
+    }
   };
 
-  const removeFile = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
-    const updatedClients = currentClients.map(client => 
-      client.id === clientId 
-        ? { 
-            ...client, 
-            [field]: client[field]?.filter((_, i) => i !== index) || [] 
-          } 
-        : client
-    );
-    updateClients(updatedClients);
+  const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const client = currentClients.find(c => c.id === clientId);
+      if (!client) throw new Error('Client not found');
+      const updatedUrls = (client[field] || []).filter((_, i) => i !== index);
+      if (onUpdateClient) {
+        onUpdateClient({ ...client, [field]: updatedUrls }, (err) => {
+          setActionLoading(false);
+          if (err) setActionError(err);
+        });
+      } else {
+        setActionLoading(false);
+      }
+    } catch (err) {
+      setActionLoading(false);
+      setActionError(err.message);
+    }
   };
 
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
@@ -139,9 +155,14 @@ const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: Client
     updateClients(updatedClients);
   };
 
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const addNewClient = () => {
+    setActionLoading(true);
+    setActionError(null);
     const newClient: Client = {
-      id: `client-${Date.now()}`,
+      id: undefined as any, // let backend assign
       name: '',
       location: '',
       policiesCount: 0,
@@ -153,23 +174,30 @@ const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: Client
       deductionDate: '',
       policyPremium: '',
     };
-
-    const updatedClients = [...currentClients, newClient];
-    updateClients(updatedClients);
+    if (onAddClient) {
+      onAddClient(newClient, (err) => {
+        setActionLoading(false);
+        if (err) setActionError(err);
+      });
+    } else {
+      setActionLoading(false);
+    }
   };
-
-  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
   const confirmDeleteClient = () => {
     if (!clientToDelete) return;
+    setActionLoading(true);
+    setActionError(null);
     if (onDeleteClient) {
-      onDeleteClient(clientToDelete.name);
+      onDeleteClient(clientToDelete.id, (err) => {
+        setActionLoading(false);
+        if (err) setActionError(err);
+        setClientToDelete(null);
+      });
     } else {
-      // Remove only the row with the matching id in the current month
-      const updatedClients = currentClients.filter(client => client.id !== clientToDelete.id);
-      updateClients(updatedClients);
+      setActionLoading(false);
+      setClientToDelete(null);
     }
-    setClientToDelete(null);
   };
 
   const initiateClientDeletion = (client: Client) => {
@@ -177,26 +205,26 @@ const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: Client
   };
 
   const updateClientField = (clientId: string, field: keyof Client, value: string | number) => {
-    const updatedClients = currentClients.map(client => 
-      client.id === clientId 
-        ? { ...client, [field]: value } 
-        : client
-    );
-    updateClients(updatedClients);
+    setActionLoading(true);
+    setActionError(null);
+    const client = currentClients.find(c => c.id === clientId);
+    if (client && onUpdateClient) {
+      onUpdateClient({ ...client, [field]: value }, (err) => {
+        setActionLoading(false);
+        if (err) setActionError(err);
+      });
+    } else {
+      setActionLoading(false);
+    }
   };
+
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
   return (
     <div className="space-y-4 relative">
-      {/* Save Button */}
-      {hasChanges && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button 
-            onClick={saveChanges} 
-            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg rounded-full px-6 py-3 transition-all duration-300 ease-in-out"
-          >
-            Save Changes
-          </Button>
-        </div>
+      {/* Error message for actions */}
+      {actionError && (
+        <div style={{ color: 'red', marginBottom: 16, textAlign: 'center' }}>{actionError}</div>
       )}
 
       {/* Search and actions bar */}
