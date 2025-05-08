@@ -159,6 +159,17 @@ const Dashboard = () => {
     }));
   };
 
+  // Remove a client by name from all months
+  const onDeleteClient = (clientName: string) => {
+    setClientsByMonth(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(month => {
+        updated[month] = updated[month].filter(client => client.name !== clientName);
+      });
+      return updated;
+    });
+  };
+
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
@@ -218,12 +229,36 @@ const Dashboard = () => {
             </>
           )}
           {showSummary && (
-            <ClientsSummaryTable summaries={clientSummaries} />
+            <ClientsSummaryTable 
+              summaries={Object.values(
+                Object.values(clientsByMonth).flat().reduce((acc, client) => {
+                  if (!acc[client.name]) {
+                    acc[client.name] = {
+                      ...client,
+                      policiesCount: 0,
+                      totalPremium: 0,
+                    };
+                  }
+                  acc[client.name].policiesCount += client.policiesCount;
+                  // Sum up numeric policyPremiums for totalPremium
+                  const premium = typeof client.policyPremium === 'string' ? Number(client.policyPremium.replace(/[^\d.]/g, '')) : Number(client.policyPremium);
+                  acc[client.name].totalPremium += isNaN(premium) ? 0 : premium;
+                  if (!acc[client.name].location && client.location) acc[client.name].location = client.location;
+                  return acc;
+                }, {} as Record<string, any>)
+              ).map(client => ({
+                name: client.name,
+                location: client.location,
+                totalPolicies: client.policiesCount,
+                totalPremium: client.totalPremium,
+              }))} 
+              onDeleteClient={onDeleteClient}
+            />
           )}
         </div>
       </div>
     </>
   );
-};
+}
 
 export default Dashboard;

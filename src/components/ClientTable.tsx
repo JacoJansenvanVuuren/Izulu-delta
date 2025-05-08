@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,9 +28,10 @@ interface Client {
 interface ClientTableProps {
   initialClients: Client[];
   onClientsChange?: (clients: Client[]) => void;
+  onDeleteClient?: (clientName: string) => void;
 }
 
-const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
+const ClientTable = ({ initialClients, onClientsChange, onDeleteClient }: ClientTableProps) => {
   // Convert string products and policyNumbers to arrays for existing clients
   const formattedInitialClients = initialClients.map(client => ({
     ...client,
@@ -39,19 +41,42 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
   }));
 
-  // Use clients directly from props; all state is managed by parent for per-month isolation
-  const clients = formattedInitialClients;
+  // Track original clients to detect changes
+  const [originalClients, setOriginalClients] = useState<Client[]>(formattedInitialClients);
+  const [currentClients, setCurrentClients] = useState<Client[]>(formattedInitialClients);
+
+  // Sync local state with initialClients if it changes (e.g., after global delete)
+  useEffect(() => {
+    setOriginalClients(formattedInitialClients);
+    setCurrentClients(formattedInitialClients);
+  }, [initialClients]);
+
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
 
   // Update parent component when clients change
-  const updateClients = (updatedClients: Client[]) => {
+  const updateClients = useCallback((updatedClients: Client[]) => {
+    setCurrentClients(updatedClients);
+    
+    // Check if there are any changes compared to the original clients
+    const changesDetected = JSON.stringify(updatedClients) !== JSON.stringify(originalClients);
+    setHasChanges(changesDetected);
+
     if (onClientsChange) {
       onClientsChange(updatedClients);
     }
+  }, [onClientsChange, originalClients]);
+
+  // Save changes and reset original clients
+  const saveChanges = () => {
+    setOriginalClients(currentClients);
+    setHasChanges(false);
+    // You might want to add additional save logic here, like API call
   };
+
   const [searchTerm, setSearchTerm] = useState<string>('');
   
   // Filter clients based on search term
-  const filteredClients = clients.filter(client => {
+  const filteredClients = currentClients.filter(client => {
     if (!searchTerm) return true;
     
     const searchLower = searchTerm.toLowerCase();
@@ -70,7 +95,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     // In a real app, you would upload to a storage provider and get a URL back
     const mockUrl = `mock-url-for-${file.name}`;
 
-    const updatedClients = clients.map(client => 
+    const updatedClients = currentClients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: mockUrl } 
         : client
@@ -82,7 +107,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
     // Create a mock URL for this file
     const mockUrl = `mock-url-for-${file.name}`;
 
-    const updatedClients = clients.map(client => 
+    const updatedClients = currentClients.map(client => 
       client.id === clientId 
         ? { 
             ...client, 
@@ -94,7 +119,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   };
 
   const removeFile = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
-    const updatedClients = clients.map(client => 
+    const updatedClients = currentClients.map(client => 
       client.id === clientId 
         ? { 
             ...client, 
@@ -106,7 +131,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   };
 
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
-    const updatedClients = clients.map(client => 
+    const updatedClients = currentClients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: values } 
         : client
@@ -129,17 +154,30 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
       policyPremium: '',
     };
 
-    const updatedClients = [...clients, newClient];
+    const updatedClients = [...currentClients, newClient];
     updateClients(updatedClients);
   };
 
-  const removeClient = (clientId: string) => {
-    const updatedClients = clients.filter(client => client.id !== clientId);
-    updateClients(updatedClients);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+
+  const confirmDeleteClient = () => {
+    if (!clientToDelete) return;
+    if (onDeleteClient) {
+      onDeleteClient(clientToDelete.name);
+    } else {
+      // Remove only the row with the matching id in the current month
+      const updatedClients = currentClients.filter(client => client.id !== clientToDelete.id);
+      updateClients(updatedClients);
+    }
+    setClientToDelete(null);
+  };
+
+  const initiateClientDeletion = (client: Client) => {
+    setClientToDelete(client);
   };
 
   const updateClientField = (clientId: string, field: keyof Client, value: string | number) => {
-    const updatedClients = clients.map(client => 
+    const updatedClients = currentClients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: value } 
         : client
@@ -148,7 +186,19 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {/* Save Button */}
+      {hasChanges && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button 
+            onClick={saveChanges} 
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg rounded-full px-6 py-3 transition-all duration-300 ease-in-out"
+          >
+            Save Changes
+          </Button>
+        </div>
+      )}
+
       {/* Search and actions bar */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
         <div className="relative w-full sm:w-auto">
@@ -207,9 +257,9 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
                 <TableCell>
                   <Input 
                     type="number"
-                    value={client.policiesCount} 
+                    value={client.policiesCount}
                     onChange={(e) => updateClientField(client.id, 'policiesCount', parseInt(e.target.value) || 0)}
-                    className="bg-transparent border-white/10" 
+                    className="bg-transparent border-white/10"
                   />
                 </TableCell>
                 <TableCell>
@@ -245,17 +295,17 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
                 <TableCell>
                   <Input 
                     type="date"
-                    value={client.issueDate} 
+                    value={client.issueDate}
                     onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)}
-                    className="bg-transparent border-white/10" 
+                    className="bg-transparent border-white/10"
                   />
                 </TableCell>
                 <TableCell>
                   <Input 
                     type="date"
-                    value={client.deductionDate} 
+                    value={client.deductionDate}
                     onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)}
-                    className="bg-transparent border-white/10" 
+                    className="bg-transparent border-white/10"
                   />
                 </TableCell>
                 <TableCell>
@@ -269,12 +319,12 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2">R</span>
                     <Input 
-                      value={client.policyPremium.replace(/^[$R]/, '')} 
+                      value={client.policyPremium.replace(/^[$R]/, '')}
                       onChange={(e) => {
                         const value = e.target.value.replace(/^[$R]/, '');
                         updateClientField(client.id, 'policyPremium', value);
                       }}
-                      className="bg-transparent border-white/10 w-full min-w-[130px] pl-7" 
+                      className="bg-transparent border-white/10 w-full min-w-[130px] pl-7"
                     />
                   </div>
                 </TableCell>
@@ -282,10 +332,10 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => removeClient(client.id)} 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => initiateClientDeletion(client)}
                           className="text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -299,99 +349,28 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
                 </TableCell>
               </TableRow>
             ))}
-            {filteredClients.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center">
-                    {searchTerm ? (
-                      <>
-                        <Search className="h-8 w-8 mb-2 text-muted-foreground/50" />
-                        <p>No results found for "{searchTerm}"</p>
-                        <Button variant="link" onClick={() => setSearchTerm('')} className="mt-2">
-                          Clear search
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-8 w-8 mb-2 text-muted-foreground/50" />
-                        <p>No client data available for this month</p>
-                        <Button variant="link" onClick={addNewClient} className="mt-2">
-                          Add your first client
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Mobile Card View */}
-      <div className="block sm:hidden space-y-4">
-        {filteredClients.map((client) => (
-          <div key={client.id} className="glass-morphism rounded-lg p-4 flex flex-col gap-3 shadow-md">
-            <div className="flex justify-between items-center mb-2">
-              <span className="font-semibold text-lg">{client.name || <span className="text-muted-foreground">Unnamed Client</span>}</span>
-              <Button size="icon" variant="ghost" onClick={() => removeClient(client.id)} className="text-destructive hover:bg-destructive/10">
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="block text-xs text-muted-foreground">Policies</span>
-                <Input type="number" value={client.policiesCount} onChange={(e) => updateClientField(client.id, 'policiesCount', parseInt(e.target.value) || 0)} className="w-full mt-1" />
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">Premium</span>
-                <div className="relative mt-1">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2">R</span>
-                  <Input value={client.policyPremium.replace(/^[$R]/, '')} onChange={(e) => updateClientField(client.id, 'policyPremium', e.target.value)} className="pl-7 w-full" />
-                </div>
-              </div>
-              <div className="col-span-2">
-                <span className="block text-xs text-muted-foreground">Products</span>
-                <MultiEntryField values={client.products} onChange={(values) => updateMultiEntryField(client.id, 'products', values)} placeholder="Add a product" />
-              </div>
-              <div className="col-span-2">
-                <span className="block text-xs text-muted-foreground">Policy Numbers</span>
-                <MultiEntryField values={client.policyNumbers} onChange={(values) => updateMultiEntryField(client.id, 'policyNumbers', values)} placeholder="Add a policy number" />
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">Issue Date</span>
-                <Input type="date" value={client.issueDate} onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)} className="w-full mt-1" />
-              </div>
-              <div>
-                <span className="block text-xs text-muted-foreground">Deduction Date</span>
-                <Input type="date" value={client.deductionDate} onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)} className="w-full mt-1" />
-              </div>
-              <div className="col-span-2">
-                <span className="block text-xs text-muted-foreground">Schedule Docs</span>
-                <MultiFileUpload onFileUpload={(file) => handleMultiFileUpload(client.id, 'scheduleDocsUrl', file)} files={client.scheduleDocsUrl || []} onRemove={(index) => removeFile(client.id, 'scheduleDocsUrl', index)} label="Schedule Documents" />
-              </div>
-              <div className="col-span-2">
-                <span className="block text-xs text-muted-foreground">PDF Docs</span>
-                <MultiFileUpload onFileUpload={(file) => handleMultiFileUpload(client.id, 'pdfDocsUrl', file)} files={client.pdfDocsUrl || []} onRemove={(index) => removeFile(client.id, 'pdfDocsUrl', index)} label="PDF Documents" />
-              </div>
-              <div className="col-span-2">
-                <span className="block text-xs text-muted-foreground">LOA & Cancellation</span>
-                <FileUpload onFileUpload={(file) => handleFileUpload(client.id, 'loaDocUrl', file)} label="LOA and Cancellation Letter" fileUrl={client.loaDocUrl} />
-              </div>
-            </div>
-          </div>
-        ))}
-        {filteredClients.length === 0 && (
-          <div className="glass-morphism rounded-lg p-8 flex flex-col items-center justify-center text-center gap-4">
-            <FileText className="h-8 w-8 mb-2 text-muted-foreground/50" />
-            <p>No client data available for this month</p>
-            <Button variant="link" onClick={addNewClient} className="w-full">
-              Add your first client
-            </Button>
-          </div>
-        )}
-      </div>
-
+      {/* Delete Dialog */}
+      <AlertDialog
+        open={!!clientToDelete}
+        onOpenChange={(open) => { if (!open) setClientToDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {clientToDelete?.name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setClientToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteClient} className="bg-destructive text-white hover:bg-destructive/80">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
