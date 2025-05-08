@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -5,18 +6,20 @@ import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus, Trash2, Search, FileText, AlertCircle, Calendar, Save } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, Calendar, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ClientData } from '@/types/clients';
-import { uploadFile } from '@/services/clientService';
+import { uploadFile, deleteClientData } from '@/services/clientService';
 import { useToast } from '@/hooks/use-toast';
 
 interface ClientTableProps {
   initialClients: ClientData[];
   onClientsChange?: (clients: ClientData[]) => void;
+  selectedMonth?: number;
+  currentYear?: number;
 }
 
-const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
+const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYear }: ClientTableProps) => {
   // Convert string products and policyNumbers to arrays for existing clients
   const formattedInitialClients = initialClients.map(client => ({
     ...client,
@@ -181,9 +184,28 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   };
 
   // Remove a client row
-  const removeClient = (clientId: string) => {
+  const removeClient = async (clientId: string) => {
+    // Remove from current view
     const updatedClients = clients.filter(client => client.id !== clientId);
     updateClientsLocal(updatedClients);
+    
+    // If this is a real client (not a temporary one), also delete from the database
+    if (!clientId.startsWith('client-temp') && selectedMonth !== undefined && currentYear !== undefined) {
+      try {
+        await deleteClientData(clientId, selectedMonth, currentYear);
+        toast({
+          title: "Success",
+          description: "Client removed from this month's data"
+        });
+      } catch (error) {
+        console.error('Error deleting client:', error);
+        toast({
+          title: "Error",
+          description: "Failed to remove client",
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   // Update a single client field
@@ -217,14 +239,6 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
           >
             <Plus className="h-4 w-4 mr-2" /> Add New Row
           </Button>
-          {hasChanges && (
-            <Button 
-              onClick={saveChanges} 
-              className="bg-green-600/90 hover:bg-green-700 text-white w-full sm:w-auto"
-            >
-              <Save className="h-4 w-4 mr-2" /> Save Changes
-            </Button>
-          )}
         </div>
       </div>
       
@@ -361,7 +375,7 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
             ))}
             {filteredClients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center">
                     {searchTerm ? (
                       <>
@@ -452,8 +466,9 @@ const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
         )}
       </div>
       
+      {/* Save changes button at the bottom left */}
       {hasChanges && (
-        <div className="fixed bottom-6 right-6">
+        <div className="fixed bottom-6 left-6">
           <Button 
             onClick={saveChanges} 
             className="bg-green-600/90 hover:bg-green-700 text-white shadow-lg flex items-center gap-2 px-4 py-2"

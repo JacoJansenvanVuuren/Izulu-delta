@@ -8,8 +8,16 @@ import MonthSelector from '@/components/MonthSelector';
 import UserProfile from '@/components/UserProfile';
 import CompanyBadge from '@/components/CompanyBadge';
 import { ClientData } from '@/types/clients';
-import { getClientDataByMonth, getClientSummaries, saveClientData, deleteClientData } from '@/services/clientService';
+import { 
+  getClientDataByMonth, 
+  getClientSummaries, 
+  saveClientData, 
+  deleteClientData, 
+  deleteAllClients 
+} from '@/services/clientService';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Trash2 } from 'lucide-react';
 
 const Dashboard = () => {
   const { isAuthenticated } = useAuth();
@@ -65,18 +73,11 @@ const Dashboard = () => {
     try {
       // Get current clients to compare
       const currentClients = clientsByMonth[selectedMonth] || [];
-      const updatedClientsMap = new Map(updatedClients.map(client => [client.id, client]));
-      const currentClientsMap = new Map(currentClients.map(client => [client.id, client]));
       
       // Find clients to add or update
       for (const updatedClient of updatedClients) {
-        const currentClient = currentClientsMap.get(updatedClient.id);
-        
-        // Only save if it's a new client or if data has actually changed
-        if (!currentClient || JSON.stringify(currentClient) !== JSON.stringify(updatedClient)) {
-          // Save client for the current month only
-          await saveClientData(updatedClient, selectedMonth, currentYear);
-        }
+        // Save client for the current month only
+        await saveClientData(updatedClient, selectedMonth, currentYear);
       }
       
       // Find clients to delete (in current month's data but not in updated data)
@@ -134,6 +135,34 @@ const Dashboard = () => {
     }
   };
 
+  // Handle deleting all clients
+  const handleDeleteAllClients = async () => {
+    try {
+      if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
+        setLoading(true);
+        await deleteAllClients();
+        
+        // Clear local state
+        setClientsByMonth({});
+        setClientSummaries([]);
+        
+        toast({
+          title: 'Success',
+          description: 'All clients have been deleted',
+        });
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error deleting all clients:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete clients',
+        variant: 'destructive'
+      });
+      setLoading(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
@@ -154,12 +183,24 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-          {/* Dashboard switch button */}
+          
+          {/* Dashboard switch button and delete all clients button */}
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gradient mb-4 md:mb-0">
               {showSummary ? 'Clients Summary Table' : 'Monthly Tracking'}
             </h1>
-            {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
+            
+            <div className="flex flex-wrap gap-4 items-center">
+              {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
+              <Button
+                onClick={handleDeleteAllClients}
+                variant="destructive"
+                className="flex items-center gap-2"
+              >
+                <Trash2 size={16} />
+                Delete All Clients
+              </Button>
+            </div>
           </div>
           
           {loading ? (
@@ -197,13 +238,17 @@ const Dashboard = () => {
                       )).size}</p>
                     </div>
                   </div>
+                  
                   {/* Client table with improved styling */}
                   <ClientTable 
                     initialClients={clients} 
-                    onClientsChange={updateClientsForCurrentMonth} 
+                    onClientsChange={updateClientsForCurrentMonth}
+                    selectedMonth={selectedMonth}
+                    currentYear={currentYear}
                   />
                 </>
               )}
+              
               {showSummary && (
                 <ClientsSummaryTable summaries={clientSummaries} />
               )}

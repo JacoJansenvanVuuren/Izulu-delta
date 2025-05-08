@@ -440,14 +440,49 @@ export const getClientDataByMonth = async (month: number, year: number = new Dat
   }
 };
 
-// Function to save a complete client data entry
+// Delete all clients from the client table
+export const deleteAllClients = async (): Promise<void> => {
+  try {
+    // Get all clients
+    const { data: clients } = await supabase
+      .from('clients')
+      .select('id');
+      
+    if (clients && clients.length > 0) {
+      // Delete all clients one by one
+      for (const client of clients) {
+        await deleteClient(client.id);
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting all clients:', error);
+    throw error;
+  }
+};
+
+// Function to save a complete client data entry - fixing TypeScript error here
 export const saveClientData = async (clientData: ClientData, month: number, year: number = new Date().getFullYear()): Promise<ClientData> => {
   try {
     let client: Client;
     
-    // Step 1: Create or update client
-    if (clientData.id && !clientData.id.startsWith('client-temp')) {
-      // Update existing client
+    // Check if a client with this name already exists
+    const { data: existingClients } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('name', clientData.name);
+    
+    if (existingClients && existingClients.length > 0) {
+      // Use existing client with the same name
+      client = existingClients[0];
+      
+      // Update location if it changed
+      if (client.location !== clientData.location) {
+        client = await updateClient(client.id, {
+          location: clientData.location
+        });
+      }
+    } else if (clientData.id && !clientData.id.startsWith('client-temp')) {
+      // Update existing client by ID
       client = await updateClient(clientData.id, {
         name: clientData.name,
         location: clientData.location
@@ -460,7 +495,7 @@ export const saveClientData = async (clientData: ClientData, month: number, year
       });
     }
     
-    // Step 2: Get or create client policy for the month
+    // Step 2: Get or create client policy for the month - Convert month to number here
     const existingPolicies = await supabase
       .from('client_policies')
       .select('*')
@@ -481,7 +516,7 @@ export const saveClientData = async (clientData: ClientData, month: number, year
         deduction_date: clientData.deductionDate || null
       });
     } else {
-      // Create new policy with month and year as numbers
+      // Create new policy with month as number
       clientPolicy = await createClientPolicy({
         client_id: client.id,
         month: month,
@@ -519,7 +554,7 @@ export const saveClientData = async (clientData: ClientData, month: number, year
       id: client.id,
       policyPremium: clientData.policyPremium.startsWith('R') ? 
         clientData.policyPremium : 
-        `R${parseFloat(clientData.policyPremium).toFixed(2)}`
+        `R${parseFloat(clientData.policyPremium.replace(/[^0-9.]/g, '') || '0').toFixed(2)}`
     };
   } catch (error) {
     console.error('Error saving client data:', error);
