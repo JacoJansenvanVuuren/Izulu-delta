@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabase';
 
 // Helper to get table name for a month and year (e.g. 'clients_january')
@@ -74,7 +75,7 @@ export async function addMonthlyClient(monthIndex: number, year: number, client:
     .select();
   if (error) throw new Error(error.message);
   
-  // Also update/create in the global clients table based on name
+  // Make sure to update the global clients table
   await updateGlobalClientFromMonthly(client);
   
   return data?.[0];
@@ -129,6 +130,8 @@ export async function deleteMonthlyClient(monthIndex: number, year: number, id: 
 async function updateGlobalClientFromMonthly(client: any) {
   if (!client.name) return;
   
+  console.log('Updating global client from monthly:', client.name);
+  
   // Check if client with this name already exists in global table
   const { data: existingClients } = await supabase
     .from('clients')
@@ -145,11 +148,13 @@ async function updateGlobalClientFromMonthly(client: any) {
   
   // Update or insert into global clients table
   if (existingClients && existingClients.length > 0) {
+    console.log('Updating existing client in global table:', client.name);
     await supabase
       .from('clients')
       .update(aggregatedData)
       .eq('name', client.name);
   } else {
+    console.log('Creating new client in global table:', client.name);
     await supabase
       .from('clients')
       .insert([{ 
@@ -216,7 +221,7 @@ function aggregateClientData(monthlyData: any[]) {
   const result = {
     location: latestRecord.location,
     products: [],
-    policiescount: 0,
+    policies_count: 0,
     policy_numbers: [],
     policy_premium: 0,
   };
@@ -224,7 +229,7 @@ function aggregateClientData(monthlyData: any[]) {
   // Aggregate numerical values and arrays
   monthlyData.forEach(record => {
     // Sum up policy count
-    result.policiescount += (record.policiescount || 0);
+    result.policies_count += (record.policiescount || 0);
     
     // Combine products without duplicates
     if (record.products) {

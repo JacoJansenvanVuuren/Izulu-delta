@@ -74,9 +74,11 @@ const Dashboard = () => {
       setLoading(true);
       fetchAllClients()
         .then(data => {
+          console.log("Global clients fetched:", data);
           setGlobalClients(data);
         })
         .catch(err => {
+          console.error("Error fetching global clients:", err);
           setError(err.message);
         })
         .finally(() => setLoading(false));
@@ -96,7 +98,7 @@ const Dashboard = () => {
         summaryMap.set(key, {
           name: client.name,
           location: client.location || '',
-          totalPolicies: client.policiescount || 0,
+          totalPolicies: client.policies_count || 0,
           totalPremium: premium,
         });
       }
@@ -112,6 +114,7 @@ const Dashboard = () => {
     
     try {
       if (showSummary) {
+        console.log("Reloading global clients");
         const data = await fetchAllClients();
         setGlobalClients(data);
       } else {
