@@ -35,15 +35,33 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
+  // Cache for monthly clients: { ["month-year"]: Client[] }
+  const [clientsCache, setClientsCache] = useState({});
 
-  // Fetch clients for the selected month/year
+  // Fetch clients for the selected month/year with cache
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetchMonthlyClients(selectedMonth, currentYear)
-      .then(data => setClients(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    const cacheKey = `${selectedMonth}-${currentYear}`;
+    if (clientsCache[cacheKey]) {
+      setClients(clientsCache[cacheKey]);
+      setLoading(false);
+      // Fetch in background to update cache
+      fetchMonthlyClients(selectedMonth, currentYear)
+        .then(data => {
+          setClientsCache(prev => ({ ...prev, [cacheKey]: data }));
+          setClients(data);
+        })
+        .catch(err => setError(err.message));
+    } else {
+      setLoading(true);
+      setError(null);
+      fetchMonthlyClients(selectedMonth, currentYear)
+        .then(data => {
+          setClientsCache(prev => ({ ...prev, [cacheKey]: data }));
+          setClients(data);
+        })
+        .catch(err => setError(err.message))
+        .finally(() => setLoading(false));
+    }
   }, [selectedMonth, currentYear]);
 
   // Summary logic (aggregate by name/location)
@@ -77,7 +95,34 @@ const Dashboard = () => {
   };
 
   // UI for loading and error
-  if (loading) return <div style={{padding: 40, textAlign: 'center'}}><span>Loading...</span></div>;
+  if (loading) return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(15, 23, 42, 0.4)',
+      zIndex: 1000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'none',
+      transition: 'background 0.3s',
+    }}>
+      <div style={{
+        width: 64,
+        height: 64,
+        border: '8px solid #fff',
+        borderTop: '8px solid #6366f1',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+        boxShadow: '0 2px 24px #6366f1cc',
+        background: 'rgba(255,255,255,0.03)'
+      }} />
+      <style>{`@keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }`}</style>
+    </div>
+  );
   if (error) return <div style={{padding: 40, color: 'red', textAlign: 'center'}}>Error: {error}</div>;
 
   return (
