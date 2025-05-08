@@ -347,9 +347,9 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2">R</span>
                     <Input 
-                      value={client.policyPremium.replace(/^[$R]/, '')}
+                      value={(client.policyPremium || client.policypremium || '').replace(/^[$R]/, '')}
                       onChange={(e) => {
-                        const value = e.target.value.replace(/^[$R]/, '');
+                        const value = (e.target.value || '').replace(/^[$R]/, '');
                         updateClientField(client.id, 'policyPremium', value);
                       }}
                       className="bg-transparent border-white/10 w-full min-w-[130px] pl-7"

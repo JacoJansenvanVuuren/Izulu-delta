@@ -68,7 +68,7 @@ const Dashboard = () => {
   const summaryMap = new Map();
   clients.forEach(client => {
     const key = `${client.name}||${client.location}`;
-    const premium = parseFloat((client.policyPremium || '').replace(/[^0-9.]/g, '')) || 0;
+    const premium = parseFloat(((client.policyPremium || client.policypremium || '').replace(/[^0-9.]/g, ''))) || 0;
     if (!summaryMap.has(key)) {
       summaryMap.set(key, {
         name: client.name,
@@ -161,7 +161,7 @@ const Dashboard = () => {
                 <div className="glass-morphism rounded-lg p-4">
                   <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
                   <p className="text-2xl font-bold">R{clients.reduce((sum, client) => {
-                    const premium = client.policyPremium.replace(/[^0-9.]/g, '');
+                    const premium = ((client.policyPremium || client.policypremium || '')).replace(/[^0-9.]/g, '');
                     return sum + (parseFloat(premium) || 0);
                   }, 0).toLocaleString()}</p>
                 </div>
