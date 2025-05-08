@@ -3,256 +3,222 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import ClientTable from '@/components/ClientTable';
-import ClientsSummaryTable from '@/components/ClientsSummaryTable';
+import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
+import ClientSummaryButton from '@/components/ClientSummaryButton';
 import MonthSelector from '@/components/MonthSelector';
 import UserProfile from '@/components/UserProfile';
 import CompanyBadge from '@/components/CompanyBadge';
-import { ClientData } from '@/types/clients';
-import { 
-  getClientDataByMonth, 
-  getClientSummaries, 
-  saveClientData, 
-  deleteClientData, 
-  deleteAllClients 
-} from '@/services/clientService';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+
+// Define Client interface (matching the one in ClientTable.tsx)
+interface Client {
+  id: string;
+  name: string;
+  location: string;
+  policiesCount: number;
+  products: string[];
+  scheduleDocsUrl?: string[];
+  pdfDocsUrl?: string[];
+  policyNumbers: string[];
+  issueDate: string;
+  deductionDate: string;
+  loaDocUrl?: string;
+  policyPremium: string;
+}
+
+// Mock client data for each month
+const generateMockData = (month: number): Client[] => {
+  // Generate different data for each month
+  const baseClients: Client[] = [
+    {
+      id: '1',
+      name: 'Acme Corporation',
+      location: 'New York',
+      policiesCount: 3 + month,
+      products: ['Life Insurance', 'Health Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-ac-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-ac-001.pdf'],
+      policyNumbers: ['PLY-2024-001'],
+      issueDate: '2024-01-15',
+      deductionDate: '2024-02-01',
+      loaDocUrl: 'mock-url-for-loa-ac-001.pdf',
+      policyPremium: '$1,500',
+    },
+    {
+      id: '2',
+      name: 'TechNova Solutions',
+      location: 'San Francisco',
+      policiesCount: 2 + (month % 5),
+      products: ['Health Insurance', 'Property Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-tn-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-tn-002.pdf'],
+      policyNumbers: ['PLY-2024-002'],
+      issueDate: '2024-02-10',
+      deductionDate: '2024-03-01',
+      loaDocUrl: 'mock-url-for-loa-tn-002.pdf',
+      policyPremium: '$2,200',
+    },
+    {
+      id: '3',
+      name: 'Global Industries',
+      location: 'London',
+      policiesCount: 5 - (month % 3),
+      products: ['Vehicle Insurance', 'Business Liability'],
+      scheduleDocsUrl: ['mock-url-for-schedule-gi-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-gi-003.pdf'],
+      policyNumbers: ['PLY-2024-003'],
+      issueDate: '2024-03-05',
+      deductionDate: '2024-04-01',
+      loaDocUrl: 'mock-url-for-loa-gi-003.pdf',
+      policyPremium: '$3,750',
+    },
+  ];
+  
+  // Add or remove clients based on month to simulate different data
+  if (month % 3 === 0) {
+    baseClients.push({
+      id: '4',
+      name: 'Marine Enterprises',
+      location: 'Cape Town',
+      policiesCount: 4,
+      products: ['Marine Insurance', 'Property Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-me-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-me-004.pdf'],
+      policyNumbers: ['PLY-2024-004'],
+      issueDate: '2024-01-20',
+      deductionDate: '2024-02-15',
+      loaDocUrl: 'mock-url-for-loa-me-004.pdf',
+      policyPremium: '$4,300',
+    });
+  }
+  
+  if (month % 2 === 0) {
+    baseClients.push({
+      id: '5',
+      name: 'Delta Shipping',
+      location: 'Rotterdam',
+      policiesCount: 2,
+      products: ['Cargo Insurance', 'Liability Insurance'],
+      scheduleDocsUrl: ['mock-url-for-schedule-ds-2024.pdf'],
+      pdfDocsUrl: ['mock-url-for-doc-ds-005.pdf'],
+      policyNumbers: ['PLY-2024-005'],
+      issueDate: '2024-02-25',
+      deductionDate: '2024-03-15',
+      loaDocUrl: 'mock-url-for-loa-ds-005.pdf',
+      policyPremium: '$2,900',
+    });
+  }
+  
+  return baseClients;
+};
 
 const Dashboard = () => {
   const { isAuthenticated } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [clientsByMonth, setClientsByMonth] = useState<Record<number, ClientData[]>>({});
-  const [clientSummaries, setClientSummaries] = useState<Array<{
-    name: string;
-    location: string;
-    totalPolicies: number;
-    totalPremium: number;
-  }>>([]);
-  const [showSummary, setShowSummary] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-  const currentYear = new Date().getFullYear();
+  // Store clients for each month separately
+  const [clientsByMonth, setClientsByMonth] = useState<Record<number, Client[]>>(() => {
+    // Initialize with data for all months
+    const initialData: Record<number, Client[]> = {};
+    for (let i = 0; i < 12; i++) {
+      initialData[i] = generateMockData(i);
+    }
+    return initialData;
+  });
 
-  // Fetch client data for the selected month
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        if (!clientsByMonth[selectedMonth]) {
-          const data = await getClientDataByMonth(selectedMonth, currentYear);
-          setClientsByMonth(prev => ({
-            ...prev,
-            [selectedMonth]: data
-          }));
-        }
-        
-        if (showSummary && clientSummaries.length === 0) {
-          const summaries = await getClientSummaries();
-          setClientSummaries(summaries);
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load client data',
-          variant: 'destructive'
-        });
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [selectedMonth, showSummary, clientsByMonth, clientSummaries.length, toast, currentYear]);
+  // Get current month's clients
+  const clients = clientsByMonth[selectedMonth] || [];
+
+  // Toggle between dashboards
+  const [showSummary, setShowSummary] = useState(false);
+
+  // Aggregate all clients across months for summary
+  const allClients = Object.values(clientsByMonth).flat();
+  const summaryMap = new Map<string, ClientSummary>();
+  allClients.forEach(client => {
+    const key = `${client.name}||${client.location}`;
+    const premium = parseFloat((client.policyPremium || '').replace(/[^0-9.]/g, '')) || 0;
+    if (!summaryMap.has(key)) {
+      summaryMap.set(key, {
+        name: client.name,
+        location: client.location,
+        totalPolicies: client.policiesCount || 0,
+        totalPremium: premium,
+      });
+    } else {
+      const entry = summaryMap.get(key)!;
+      entry.totalPolicies += client.policiesCount || 0;
+      entry.totalPremium += premium;
+    }
+  });
+  const clientSummaries = Array.from(summaryMap.values());
 
   // Update clients for the current month only
-  const updateClientsForCurrentMonth = async (updatedClients: ClientData[]) => {
-    try {
-      // Get current clients to compare
-      const currentClients = clientsByMonth[selectedMonth] || [];
-      
-      // Find clients to add or update
-      for (const updatedClient of updatedClients) {
-        // Save client for the current month only
-        await saveClientData(updatedClient, selectedMonth, currentYear);
-      }
-      
-      // Find clients to delete (in current month's data but not in updated data)
-      const updatedClientIds = new Set(updatedClients.map(c => c.id));
-      for (const currentClient of currentClients) {
-        if (!updatedClientIds.has(currentClient.id)) {
-          // Delete client from the current month only
-          await deleteClientData(currentClient.id, selectedMonth, currentYear);
-        }
-      }
-      
-      // Update state with the new client list for the current month only
-      setClientsByMonth(prev => ({
-        ...prev,
-        [selectedMonth]: updatedClients
-      }));
-      
-      // If showing summary, refresh it to reflect the latest changes
-      if (showSummary) {
-        const summaries = await getClientSummaries();
-        setClientSummaries(summaries);
-      }
-      
-      toast({
-        title: 'Success',
-        description: 'Client data saved successfully',
-      });
-    } catch (error) {
-      console.error('Error updating clients:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save client data',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Handle switching between monthly and summary views
-  const toggleDashboard = async () => {
-    const newShowSummary = !showSummary;
-    setShowSummary(newShowSummary);
-    
-    try {
-      if (newShowSummary && clientSummaries.length === 0) {
-        const summaries = await getClientSummaries();
-        setClientSummaries(summaries);
-      }
-    } catch (error) {
-      console.error('Error fetching summaries:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load client summaries',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Handle deleting all clients
-  const handleDeleteAllClients = async () => {
-    try {
-      if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
-        setLoading(true);
-        await deleteAllClients();
-        
-        // Clear local state
-        setClientsByMonth({});
-        setClientSummaries([]);
-        
-        toast({
-          title: 'Success',
-          description: 'All clients have been deleted',
-        });
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error deleting all clients:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete clients',
-        variant: 'destructive'
-      });
-      setLoading(false);
-    }
+  const updateClientsForCurrentMonth = (updatedClients: Client[]) => {
+    setClientsByMonth(prev => ({
+      ...prev,
+      [selectedMonth]: updatedClients
+    }));
   };
 
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
-  // Get current month's clients
-  const clients = clientsByMonth[selectedMonth] || [];
-
   return (
     <>
+
       <div className="min-h-screen bg-gradient-to-b from-background to-black/80 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header with improved layout */}
           <div className="glass-morphism rounded-lg p-6 mb-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <UserProfile onToggleDashboard={toggleDashboard} isSummary={showSummary} />
+              <UserProfile onToggleDashboard={() => setShowSummary(s => !s)} isSummary={showSummary} />
               <div className="flex justify-end items-center">
                 <CompanyBadge />
               </div>
             </div>
           </div>
-          
-          {/* Dashboard switch button and delete all clients button */}
+          {/* Dashboard switch button */}
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gradient mb-4 md:mb-0">
               {showSummary ? 'Clients Summary Table' : 'Monthly Tracking'}
             </h1>
-            
-            <div className="flex flex-wrap gap-4 items-center">
-              {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
-              <Button
-                onClick={handleDeleteAllClients}
-                variant="destructive"
-                className="flex items-center gap-2"
-              >
-                <Trash2 size={16} />
-                Delete All Clients
-              </Button>
-            </div>
+            {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
           </div>
-          
-          {loading ? (
-            <div className="glass-morphism rounded-lg p-12 flex justify-center items-center">
-              <div className="animate-pulse flex flex-col items-center">
-                <div className="h-8 w-32 bg-primary/20 rounded mb-4"></div>
-                <div className="text-muted-foreground">Loading client data...</div>
-              </div>
-            </div>
-          ) : (
+          {/* Stats cards */}
+          {!showSummary && (
             <>
-              {/* Stats cards */}
-              {!showSummary && (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="glass-morphism rounded-lg p-4">
-                      <h3 className="text-muted-foreground text-sm mb-1">Total Clients</h3>
-                      <p className="text-2xl font-bold">{clients.length}</p>
-                    </div>
-                    <div className="glass-morphism rounded-lg p-4">
-                      <h3 className="text-muted-foreground text-sm mb-1">Total Policies</h3>
-                      <p className="text-2xl font-bold">{clients.reduce((sum, client) => sum + client.policiesCount, 0)}</p>
-                    </div>
-                    <div className="glass-morphism rounded-lg p-4">
-                      <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
-                      <p className="text-2xl font-bold">R{clients.reduce((sum, client) => {
-                        const premium = client.policyPremium.replace(/[^0-9.]/g, '');
-                        return sum + (parseFloat(premium) || 0);
-                      }, 0).toLocaleString()}</p>
-                    </div>
-                    <div className="glass-morphism rounded-lg p-4">
-                      <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
-                      <p className="text-2xl font-bold">{new Set(clients.flatMap(client => 
-                        Array.isArray(client.products) ? client.products : []
-                      )).size}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Client table with improved styling */}
-                  <ClientTable 
-                    initialClients={clients} 
-                    onClientsChange={updateClientsForCurrentMonth}
-                    selectedMonth={selectedMonth}
-                    currentYear={currentYear}
-                  />
-                </>
-              )}
-              
-              {showSummary && (
-                <ClientsSummaryTable summaries={clientSummaries} />
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="glass-morphism rounded-lg p-4">
+                  <h3 className="text-muted-foreground text-sm mb-1">Total Clients</h3>
+                  <p className="text-2xl font-bold">{clients.length}</p>
+                </div>
+                <div className="glass-morphism rounded-lg p-4">
+                  <h3 className="text-muted-foreground text-sm mb-1">Total Policies</h3>
+                  <p className="text-2xl font-bold">{clients.reduce((sum, client) => sum + client.policiesCount, 0)}</p>
+                </div>
+                <div className="glass-morphism rounded-lg p-4">
+                  <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
+                  <p className="text-2xl font-bold">R{clients.reduce((sum, client) => {
+                    const premium = client.policyPremium.replace(/[^0-9.]/g, '');
+                    return sum + (parseFloat(premium) || 0);
+                  }, 0).toLocaleString()}</p>
+                </div>
+                <div className="glass-morphism rounded-lg p-4">
+                  <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
+                  <p className="text-2xl font-bold">{new Set(clients.flatMap(client => 
+                    Array.isArray(client.products) ? client.products : []
+                  )).size}</p>
+                </div>
+              </div>
+              {/* Client table with improved styling */}
+              <ClientTable 
+                initialClients={clients} 
+                onClientsChange={updateClientsForCurrentMonth} 
+              />
             </>
+          )}
+          {showSummary && (
+            <ClientsSummaryTable summaries={clientSummaries} />
           )}
         </div>
       </div>

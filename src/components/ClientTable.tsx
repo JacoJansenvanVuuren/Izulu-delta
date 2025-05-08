@@ -1,25 +1,35 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus, Trash2, Search, FileText, Calendar, Save } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle, Calendar } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ClientData } from '@/types/clients';
-import { uploadFile, deleteClientData } from '@/services/clientService';
-import { useToast } from '@/hooks/use-toast';
 
-interface ClientTableProps {
-  initialClients: ClientData[];
-  onClientsChange?: (clients: ClientData[]) => void;
-  selectedMonth?: number;
-  currentYear?: number;
+interface Client {
+  id: string;
+  name: string;
+  location: string;
+  policiesCount: number;
+  products: string[];
+  scheduleDocsUrl?: string[];
+  pdfDocsUrl?: string[];
+  policyNumbers: string[];
+  issueDate: string;
+  deductionDate: string;
+  loaDocUrl?: string;
+  policyPremium: string;
 }
 
-const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYear }: ClientTableProps) => {
+interface ClientTableProps {
+  initialClients: Client[];
+  onClientsChange?: (clients: Client[]) => void;
+}
+
+const ClientTable = ({ initialClients, onClientsChange }: ClientTableProps) => {
   // Convert string products and policyNumbers to arrays for existing clients
   const formattedInitialClients = initialClients.map(client => ({
     ...client,
@@ -29,36 +39,16 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
     pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
   }));
 
-  // Local state for clients - changes won't be saved until explicitly requested
-  const [clients, setClients] = useState<ClientData[]>(formattedInitialClients);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
-  const { toast } = useToast();
-  
-  // Update local state when initialClients change
-  useEffect(() => {
-    setClients(formattedInitialClients);
-    setHasChanges(false);
-  }, [JSON.stringify(initialClients)]);
+  // Use clients directly from props; all state is managed by parent for per-month isolation
+  const clients = formattedInitialClients;
 
-  // Update clients state without triggering parent save
-  const updateClientsLocal = (updatedClients: ClientData[]) => {
-    setClients(updatedClients);
-    setHasChanges(true);
-  };
-
-  // Save changes to parent component when explicitly requested
-  const saveChanges = () => {
+  // Update parent component when clients change
+  const updateClients = (updatedClients: Client[]) => {
     if (onClientsChange) {
-      onClientsChange(clients);
-      setHasChanges(false);
-      toast({
-        title: "Saving Changes",
-        description: "Your changes are being saved"
-      });
+      onClientsChange(updatedClients);
     }
   };
+  const [searchTerm, setSearchTerm] = useState<string>('');
   
   // Filter clients based on search term
   const filteredClients = clients.filter(client => {
@@ -74,72 +64,35 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
     );
   });
 
-  // Handle file upload for LOA documents
-  const handleFileUpload = async (clientId: string, field: 'loaDocUrl', file: File) => {
-    try {
-      setIsUploading(true);
-      
-      // Upload to Supabase storage
-      const fileUrl = await uploadFile(file);
-      
-      const updatedClients = clients.map(client => 
-        client.id === clientId 
-          ? { ...client, [field]: fileUrl } 
-          : client
-      );
-      
-      updateClientsLocal(updatedClients);
-      toast({
-        title: "Success",
-        description: "Document uploaded successfully"
-      });
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload document",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-    }
+  // In a real app, this would interact with your storage solution
+  const handleFileUpload = (clientId: string, field: 'loaDocUrl', file: File) => {
+    // This is a mock implementation since we can't actually upload files without a backend
+    // In a real app, you would upload to a storage provider and get a URL back
+    const mockUrl = `mock-url-for-${file.name}`;
+
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { ...client, [field]: mockUrl } 
+        : client
+    );
+    updateClients(updatedClients);
   };
 
-  // Handle multi-file uploads (scheduleDocsUrl, pdfDocsUrl)
-  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
-    try {
-      setIsUploading(true);
-      
-      // Upload to Supabase storage
-      const fileUrl = await uploadFile(file);
+  const handleMultiFileUpload = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
+    // Create a mock URL for this file
+    const mockUrl = `mock-url-for-${file.name}`;
 
-      const updatedClients = clients.map(client => 
-        client.id === clientId 
-          ? { 
-              ...client, 
-              [field]: [...(client[field] || []), fileUrl]
-            } 
-          : client
-      );
-      
-      updateClientsLocal(updatedClients);
-      toast({
-        title: "Success",
-        description: "Document uploaded successfully"
-      });
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload document",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-    }
+    const updatedClients = clients.map(client => 
+      client.id === clientId 
+        ? { 
+            ...client, 
+            [field]: [...(client[field] || []), mockUrl]
+          } 
+        : client
+    );
+    updateClients(updatedClients);
   };
 
-  // Remove file from multi-file uploads
   const removeFile = (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
@@ -149,23 +102,21 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
           } 
         : client
     );
-    updateClientsLocal(updatedClients);
+    updateClients(updatedClients);
   };
 
-  // Update multi-entry fields (products and policy numbers)
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: values } 
         : client
     );
-    updateClientsLocal(updatedClients);
+    updateClients(updatedClients);
   };
 
-  // Add a new empty client row
   const addNewClient = () => {
-    const newClient: ClientData = {
-      id: `client-temp-${Date.now()}`,
+    const newClient: Client = {
+      id: `client-${Date.now()}`,
       name: '',
       location: '',
       policiesCount: 0,
@@ -175,47 +126,25 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
       pdfDocsUrl: [],
       issueDate: '',
       deductionDate: '',
-      loaDocUrl: undefined,
-      policyPremium: '0',
+      policyPremium: '',
     };
 
     const updatedClients = [...clients, newClient];
-    updateClientsLocal(updatedClients);
+    updateClients(updatedClients);
   };
 
-  // Remove a client row
-  const removeClient = async (clientId: string) => {
-    // Remove from current view
+  const removeClient = (clientId: string) => {
     const updatedClients = clients.filter(client => client.id !== clientId);
-    updateClientsLocal(updatedClients);
-    
-    // If this is a real client (not a temporary one), also delete from the database
-    if (!clientId.startsWith('client-temp') && selectedMonth !== undefined && currentYear !== undefined) {
-      try {
-        await deleteClientData(clientId, selectedMonth, currentYear);
-        toast({
-          title: "Success",
-          description: "Client removed from this month's data"
-        });
-      } catch (error) {
-        console.error('Error deleting client:', error);
-        toast({
-          title: "Error",
-          description: "Failed to remove client",
-          variant: "destructive"
-        });
-      }
-    }
+    updateClients(updatedClients);
   };
 
-  // Update a single client field
-  const updateClientField = (clientId: string, field: keyof ClientData, value: string | number) => {
+  const updateClientField = (clientId: string, field: keyof Client, value: string | number) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: value } 
         : client
     );
-    updateClientsLocal(updatedClients);
+    updateClients(updatedClients);
   };
 
   return (
@@ -233,10 +162,7 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
         </div>
         
         <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-          <Button 
-            onClick={addNewClient} 
-            className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto"
-          >
+          <Button onClick={addNewClient} className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" /> Add New Row
           </Button>
         </div>
@@ -375,7 +301,7 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
             ))}
             {filteredClients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center">
                     {searchTerm ? (
                       <>
@@ -465,20 +391,7 @@ const ClientTable = ({ initialClients, onClientsChange, selectedMonth, currentYe
           </div>
         )}
       </div>
-      
-      {/* Save changes button at the bottom left */}
-      {hasChanges && (
-        <div className="fixed bottom-6 left-6">
-          <Button 
-            onClick={saveChanges} 
-            className="bg-green-600/90 hover:bg-green-700 text-white shadow-lg flex items-center gap-2 px-4 py-2"
-            size="lg"
-          >
-            <Save className="h-4 w-4" /> 
-            Save Changes
-          </Button>
-        </div>
-      )}
+
     </div>
   );
 };
