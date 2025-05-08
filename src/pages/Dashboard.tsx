@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import ClientTable from '@/components/ClientTable';
 import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
-import ClientSummaryButton from '@/components/ClientSummaryButton';
 import MonthSelector from '@/components/MonthSelector';
 import UserProfile from '@/components/UserProfile';
 import CompanyBadge from '@/components/CompanyBadge';
@@ -9,8 +9,11 @@ import {
   fetchMonthlyClients, 
   addMonthlyClient, 
   updateMonthlyClient, 
-  deleteMonthlyClient 
+  deleteMonthlyClient,
+  fetchAllClients,
+  deleteClient
 } from '../utils/supabaseDashboard';
+import { toast } from "@/components/ui/use-toast";
 
 // Define Client interface (matching the one in ClientTable.tsx)
 interface Client {
@@ -32,11 +35,12 @@ const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const currentYear = new Date().getFullYear();
   const [clients, setClients] = useState<Client[] | null>(null);
+  const [globalClients, setGlobalClients] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
   // Cache for monthly clients: { ["month-year"]: Client[] }
-  const [clientsCache, setClientsCache] = useState({});
+  const [clientsCache, setClientsCache] = useState<Record<string, Client[]>>({});
 
   // Fetch clients for the selected month/year with cache
   useEffect(() => {
@@ -64,38 +68,89 @@ const Dashboard = () => {
     }
   }, [selectedMonth, currentYear]);
 
+  // Fetch global clients for the summary view
+  useEffect(() => {
+    if (showSummary) {
+      setLoading(true);
+      fetchAllClients()
+        .then(data => {
+          setGlobalClients(data);
+        })
+        .catch(err => {
+          setError(err.message);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [showSummary]);
+
   // Summary logic (aggregate by name/location)
   const summaryMap = new Map();
   const clientSummaries = (() => {
-    if (!clients || clients.length === 0) return [];
+    if (!globalClients || globalClients.length === 0) return [];
     
-    clients.forEach(client => {
-    const key = `${client.name}||${client.location}`;
-    const premium = parseFloat(((client.policyPremium || '').replace(/[^0-9.]/g, ''))) || 0;
-    if (!summaryMap.has(key)) {
-      summaryMap.set(key, {
-        name: client.name,
-        location: client.location,
-        totalPolicies: client.policiesCount || 0,
-        totalPremium: premium,
-      });
-    } else {
-      const entry = summaryMap.get(key);
-      entry.totalPolicies += client.policiesCount || 0;
-      entry.totalPremium += premium;
-    }
-  });
+    globalClients.forEach(client => {
+      const key = `${client.name}||${client.location}`;
+      const premium = client.policy_premium || 0;
+      
+      if (!summaryMap.has(key)) {
+        summaryMap.set(key, {
+          name: client.name,
+          location: client.location || '',
+          totalPolicies: client.policiescount || 0,
+          totalPremium: premium,
+        });
+      }
+    });
+    
     return Array.from(summaryMap.values());
   })();
 
   // Update clients after add/update/delete
-  const reloadClients = () => {
+  const reloadClients = async () => {
     setLoading(true);
     setError(null);
-    fetchMonthlyClients(selectedMonth, currentYear)
-      .then(data => setClients(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    
+    try {
+      if (showSummary) {
+        const data = await fetchAllClients();
+        setGlobalClients(data);
+      } else {
+        const data = await fetchMonthlyClients(selectedMonth, currentYear);
+        setClients(data);
+        setClientsCache(prev => ({ ...prev, [`${selectedMonth}-${currentYear}`]: data }));
+      }
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle deleting a client from the global client table
+  const handleDeleteGlobalClient = async (clientName: string) => {
+    try {
+      setLoading(true);
+      await deleteClient(clientName);
+      toast({
+        title: "Client Deleted",
+        description: `${clientName} has been removed from all records`,
+      });
+      reloadClients();
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // UI for loading and error
@@ -131,7 +186,6 @@ const Dashboard = () => {
 
   return (
     <>
-
       <div className="min-h-screen bg-gradient-to-b from-background to-black/80 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header with improved layout */}
@@ -146,7 +200,7 @@ const Dashboard = () => {
           {/* Dashboard switch button */}
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gradient mb-4 md:mb-0">
-              {showSummary ? 'Clients Summary Table' : 'Monthly Tracking'}
+              {showSummary ? 'Global Clients Table' : 'Monthly Tracking'}
             </h1>
             {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
           </div>
@@ -187,9 +241,19 @@ const Dashboard = () => {
                     await addMonthlyClient(selectedMonth, currentYear, client);
                     reloadClients();
                     if (cb) cb();
-                  } catch (err) {
+                    
+                    toast({
+                      title: "Client Added",
+                      description: "New client has been added successfully",
+                    });
+                  } catch (err: any) {
                     setError(err.message);
-                    if (cb) cb(err);
+                    toast({
+                      title: "Error",
+                      description: err.message,
+                      variant: "destructive"
+                    });
+                    if (cb) cb(err.message);
                   } finally {
                     setLoading(false);
                   }
@@ -201,9 +265,19 @@ const Dashboard = () => {
                     await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
                     reloadClients();
                     if (cb) cb();
-                  } catch (err) {
+                    
+                    toast({
+                      title: "Client Updated",
+                      description: "Client information has been updated",
+                    });
+                  } catch (err: any) {
                     setError(err.message);
-                    if (cb) cb(err);
+                    toast({
+                      title: "Error",
+                      description: err.message,
+                      variant: "destructive"
+                    });
+                    if (cb) cb(err.message);
                   } finally {
                     setLoading(false);
                   }
@@ -215,19 +289,32 @@ const Dashboard = () => {
                     await deleteMonthlyClient(selectedMonth, currentYear, id);
                     reloadClients();
                     if (cb) cb();
-                  } catch (err) {
+                    
+                    toast({
+                      title: "Client Deleted",
+                      description: "Client has been removed successfully",
+                    });
+                  } catch (err: any) {
                     setError(err.message);
-                    if (cb) cb(err);
+                    toast({
+                      title: "Error",
+                      description: err.message,
+                      variant: "destructive"
+                    });
+                    if (cb) cb(err.message);
                   } finally {
                     setLoading(false);
                   }
                 }}
+                selectedMonth={selectedMonth}
+                currentYear={currentYear}
               />
             </>
           )}
           {showSummary && (
             <ClientsSummaryTable 
               summaries={clientSummaries}
+              onDeleteClient={handleDeleteGlobalClient}
             />
           )}
         </div>

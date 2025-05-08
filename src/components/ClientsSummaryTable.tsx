@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2 } from 'lucide-react';
@@ -18,6 +19,13 @@ interface ClientsSummaryTableProps {
 const ClientsSummaryTable: React.FC<ClientsSummaryTableProps> = ({ summaries, onDeleteClient }) => {
   const [clientToDelete, setClientToDelete] = React.useState<string | null>(null);
 
+  const handleDeleteConfirm = () => {
+    if (clientToDelete && onDeleteClient) {
+      onDeleteClient(clientToDelete);
+      setClientToDelete(null);
+    }
+  };
+
   return (
     <div className="glass-morphism rounded-lg overflow-hidden">
       <Table>
@@ -31,37 +39,50 @@ const ClientsSummaryTable: React.FC<ClientsSummaryTableProps> = ({ summaries, on
           </TableRow>
         </TableHeader>
         <TableBody>
-          {summaries.map((client) => (
-            <TableRow key={client.name + client.location}>
-              <TableCell>{client.name}</TableCell>
-              <TableCell>{client.location}</TableCell>
-              <TableCell>{client.totalPolicies}</TableCell>
-              <TableCell>R{client.totalPremium.toLocaleString()}</TableCell>
-              <TableCell>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button className="text-red-500 hover:text-red-700">
+          {summaries.length > 0 ? (
+            summaries.map((client) => (
+              <TableRow key={client.name + client.location}>
+                <TableCell>{client.name}</TableCell>
+                <TableCell>{client.location}</TableCell>
+                <TableCell>{client.totalPolicies}</TableCell>
+                <TableCell>R{client.totalPremium.toLocaleString()}</TableCell>
+                <TableCell>
+                  {onDeleteClient && (
+                    <button 
+                      className="text-red-500 hover:text-red-700"
+                      onClick={() => setClientToDelete(client.name)}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Client</AlertDialogTitle>
-                    </AlertDialogHeader>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete {client.name}?
-                    </AlertDialogDescription>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onDeleteClient?.(client.name)}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                No clients found. Add clients in the monthly view.
               </TableCell>
             </TableRow>
-          ))}
+          )}
         </TableBody>
       </Table>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogDescription>
+            Are you sure you want to delete {clientToDelete}? This will remove the client from ALL months.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

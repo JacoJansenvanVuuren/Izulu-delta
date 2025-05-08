@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { uploadPdf } from '../utils/supabaseDashboard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -7,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus, Trash2, Search, FileText, AlertCircle, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle, Calendar, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from "@/components/ui/use-toast";
 
 interface Client {
   id: string;
@@ -30,9 +32,11 @@ interface ClientTableProps {
   onAddClient?: (client: Client, cb?: (err?: string) => void) => void;
   onUpdateClient?: (client: Client, cb?: (err?: string) => void) => void;
   onDeleteClient?: (id: string, cb?: (err?: string) => void) => void;
+  selectedMonth: number;
+  currentYear: number;
 }
 
-const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient }: ClientTableProps): JSX.Element | null => {
+const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient, selectedMonth, currentYear }: ClientTableProps): JSX.Element | null => {
   // Ensure initialClients is always an array
   const safeInitialClients = initialClients || [];
 
@@ -56,29 +60,20 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
 
   // Track original clients to detect changes
   const [originalClients, setOriginalClients] = useState<Client[]>(formattedInitialClients);
-  const [clients, setClients] = useState<Client[]>(initialClients);
+  const [clients, setClients] = useState<Client[]>(formattedInitialClients);
   const [unsavedChanges, setUnsavedChanges] = useState<{[key: string]: Partial<Client>}>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Sync local state with initialClients if it changes (e.g., after global delete)
   useEffect(() => {
     setOriginalClients(formattedInitialClients);
     setClients(formattedInitialClients);
+    setUnsavedChanges({});
+    setHasUnsavedChanges(false);
   }, [initialClients]);
 
-  const [hasChanges, setHasChanges] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Update parent component when clients change
-  const updateClients = useCallback((updatedClients: Client[]) => {
-    setClients(updatedClients);
-    
-    // Check if there are any changes compared to the original clients
-    const changesDetected = JSON.stringify(updatedClients) !== JSON.stringify(originalClients);
-    setHasChanges(changesDetected);
-  }, [originalClients]);
-
-  // Search term is now properly declared
-  
   // Filter clients based on search term
   const filteredClients = clients.filter(client => {
     if (!searchTerm) return true;
@@ -103,22 +98,27 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       if (!client) throw new Error('Client not found');
       const path = `${clientId}/${field}/${Date.now()}_${file.name}`;
       const url = await uploadPdf(file, path);
-      if (onUpdateClient) {
-        onUpdateClient({ ...client, [field]: url }, (err) => {
-          setActionLoading(false);
-          if (err) setActionError(err);
-        });
-      } else {
-        setActionLoading(false);
-      }
-    } catch (err) {
+      
+      // Update local state instead of immediately sending to server
+      const updatedClients = clients.map(c => 
+        c.id === clientId ? { ...c, [field]: url } : c
+      );
+      setClients(updatedClients);
+      
+      setUnsavedChanges(prev => ({
+        ...prev,
+        [clientId]: { ...(prev[clientId] || {}), [field]: url }
+      }));
+      
+      setHasUnsavedChanges(true);
+      setActionLoading(false);
+    } catch (err: any) {
       setActionLoading(false);
       setActionError(err.message);
     }
   };
 
   const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
-    setUnsavedChanges(prev => ({ ...prev, [clientId]: { ...(prev[clientId] || {}) } }));
     setActionLoading(true);
     setActionError(null);
     try {
@@ -127,37 +127,48 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       const path = `${clientId}/${field}/${Date.now()}_${file.name}`;
       const url = await uploadPdf(file, path);
       const updatedUrls = [...(client[field] || []), url];
-      if (onUpdateClient) {
-        onUpdateClient({ ...client, [field]: updatedUrls }, (err) => {
-          setActionLoading(false);
-          if (err) setActionError(err);
-        });
-      } else {
-        setActionLoading(false);
-      }
-    } catch (err) {
+      
+      // Update local state
+      const updatedClients = clients.map(c => 
+        c.id === clientId ? { ...c, [field]: updatedUrls } : c
+      );
+      setClients(updatedClients);
+      
+      setUnsavedChanges(prev => ({
+        ...prev,
+        [clientId]: { ...(prev[clientId] || {}), [field]: updatedUrls }
+      }));
+      
+      setHasUnsavedChanges(true);
+      setActionLoading(false);
+    } catch (err: any) {
       setActionLoading(false);
       setActionError(err.message);
     }
   };
 
   const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
-    setUnsavedChanges(prev => ({ ...prev, [clientId]: { ...(prev[clientId] || {}) } }));
     setActionLoading(true);
     setActionError(null);
     try {
       const client = clients.find(c => c.id === clientId);
       if (!client) throw new Error('Client not found');
       const updatedUrls = (client[field] || []).filter((_, i) => i !== index);
-      if (onUpdateClient) {
-        onUpdateClient({ ...client, [field]: updatedUrls }, (err) => {
-          setActionLoading(false);
-          if (err) setActionError(err);
-        });
-      } else {
-        setActionLoading(false);
-      }
-    } catch (err) {
+      
+      // Update local state
+      const updatedClients = clients.map(c => 
+        c.id === clientId ? { ...c, [field]: updatedUrls } : c
+      );
+      setClients(updatedClients);
+      
+      setUnsavedChanges(prev => ({
+        ...prev,
+        [clientId]: { ...(prev[clientId] || {}), [field]: updatedUrls }
+      }));
+      
+      setHasUnsavedChanges(true);
+      setActionLoading(false);
+    } catch (err: any) {
       setActionLoading(false);
       setActionError(err.message);
     }
@@ -174,6 +185,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       ...prev,
       [clientId]: { ...(prev[clientId] || {}), [field]: values }
     }));
+    setHasUnsavedChanges(true);
   };
 
   const updateClientField = (clientId: string, field: keyof Client, value: string | string[] | number) => {
@@ -185,6 +197,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       ...prev,
       [clientId]: { ...(prev[clientId] || {}), [field]: value }
     }));
+    setHasUnsavedChanges(true);
   };
 
   const initiateClientDeletion = (client: Client) => {
@@ -207,7 +220,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
           }
         });
       });
-    } catch (error) {
+    } catch (error: any) {
       setActionError(error instanceof Error ? error.message : 'An error occurred during client deletion');
     } finally {
       // Always reset client to delete and loading state
@@ -239,43 +252,91 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         setActionLoading(false);
         if (err) setActionError(err);
       });
-    } catch (error) {
+    } catch (error: any) {
       setActionLoading(false);
       setActionError(error instanceof Error ? error.message : 'An error occurred');
     }
   };
 
-  const saveClientChanges = async (clientId: string) => {
-    const changedClient = unsavedChanges[clientId];
-    if (!changedClient) return;
+  const saveAllChanges = async () => {
+    if (!onUpdateClient || Object.keys(unsavedChanges).length === 0) return;
+    
+    setActionLoading(true);
+    setActionError(null);
+    
+    try {
+      const promises = Object.entries(unsavedChanges).map(([clientId, changes]) => {
+        const client = clients.find(c => c.id === clientId);
+        if (!client) return Promise.resolve();
+        
+        return new Promise<void>((resolve, reject) => {
+          onUpdateClient?.(
+            { ...client, ...changes },
+            (err) => {
+              if (err) reject(new Error(err));
+              else resolve();
+            }
+          );
+        });
+      });
+      
+      await Promise.all(promises);
+      
+      // Clear all unsaved changes
+      setUnsavedChanges({});
+      setHasUnsavedChanges(false);
+      
+      toast({
+        title: "Changes Saved",
+        description: "All changes have been saved successfully",
+      });
+    } catch (error: any) {
+      setActionError(error instanceof Error ? error.message : 'An error occurred while saving changes');
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'An error occurred while saving changes',
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-    const client = clients.find(c => c.id === clientId);
-    if (!client) return;
-
+  const handleDeleteAllClients = async () => {
+    if (!onDeleteClient) return;
+    
     try {
       setActionLoading(true);
       setActionError(null);
-
-      if (onUpdateClient) {
-        await new Promise<void>((resolve, reject) => {
-          onUpdateClient({
-            ...client,
-            ...changedClient
-          }, (err) => {
+      
+      // Confirm with user
+      if (!confirm("Are you sure you want to delete ALL clients for this month? This action cannot be undone.")) {
+        setActionLoading(false);
+        return;
+      }
+      
+      const deletePromises = clients.map(client => 
+        new Promise<void>((resolve, reject) => {
+          onDeleteClient(client.id, (err) => {
             if (err) reject(new Error(err));
             else resolve();
           });
-        });
-      }
-
-      // Clear unsaved changes for this client
-      setUnsavedChanges(prev => {
-        const newChanges = { ...prev };
-        delete newChanges[clientId];
-        return newChanges;
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      
+      toast({
+        title: "All Clients Deleted",
+        description: `All clients for the selected month have been deleted`,
       });
-    } catch (error) {
+    } catch (error: any) {
       setActionError(error instanceof Error ? error.message : 'An error occurred');
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: "destructive"
+      });
     } finally {
       setActionLoading(false);
     }
@@ -301,8 +362,21 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         </div>
         
         <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-          <Button onClick={addNewClient} className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto">
+          <Button 
+            onClick={addNewClient} 
+            className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 w-full sm:w-auto"
+            disabled={actionLoading}
+          >
             <Plus className="h-4 w-4 mr-2" /> Add New Row
+          </Button>
+          
+          <Button 
+            onClick={handleDeleteAllClients} 
+            variant="destructive" 
+            className="w-full sm:w-auto"
+            disabled={actionLoading || clients.length === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Delete All
           </Button>
         </div>
       </div>
@@ -434,23 +508,6 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                         <TooltipContent>Delete Client</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    {unsavedChanges[client.id] && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="secondary" 
-                              size="sm" 
-                              onClick={() => saveClientChanges(client.id)}
-                              disabled={actionLoading}
-                            >
-                              Save Changes
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Save unsaved changes for this client</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -458,6 +515,19 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
           </TableBody>
         </Table>
       </div>
+
+      {/* Save Changes Button (Bottom Left) */}
+      {hasUnsavedChanges && (
+        <div className="flex justify-start mt-4">
+          <Button
+            onClick={saveAllChanges}
+            disabled={actionLoading}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Save className="h-4 w-4 mr-2" /> Save All Changes
+          </Button>
+        </div>
+      )}
 
       {/* Delete Dialog */}
       <AlertDialog
@@ -468,7 +538,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Client</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {clientToDelete?.name}?
+              Are you sure you want to delete {clientToDelete?.name}? This will only remove them from the current month.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
