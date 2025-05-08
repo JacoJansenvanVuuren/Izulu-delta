@@ -32,41 +32,55 @@ interface ClientTableProps {
   onDeleteClient?: (id: string, cb?: (err?: string) => void) => void;
 }
 
-const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient }: ClientTableProps) => {
+const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient }: ClientTableProps): JSX.Element | null => {
+  // Ensure initialClients is always an array
+  const safeInitialClients = initialClients || [];
+
+  // Return loading state if clients are null or empty and no ability to add
+  if (safeInitialClients.length === 0 && !onAddClient) return (
+    <div className="flex justify-center items-center h-full">
+      <p className="text-muted-foreground">No clients available. Click 'Add New Row' to get started.</p>
+    </div>
+  );
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   // Convert string products and policyNumbers to arrays for existing clients
-  const formattedInitialClients = initialClients.map(client => ({
+  const formattedInitialClients = safeInitialClients.map(client => ({
     ...client,
     products: Array.isArray(client.products) ? client.products : [],
-    policyNumbers: Array.isArray(client.policyNumbers) ? client.policyNumbers : [client.policyNumbers],
-    scheduleDocsUrl: Array.isArray(client.scheduleDocsUrl) ? client.scheduleDocsUrl : client.scheduleDocsUrl ? [client.scheduleDocsUrl] : [],
-    pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : client.pdfDocsUrl ? [client.pdfDocsUrl] : []
+    policyNumbers: Array.isArray(client.policyNumbers) ? client.policyNumbers : (client.policyNumbers ? [client.policyNumbers] : []),
+    scheduleDocsUrl: Array.isArray(client.scheduleDocsUrl) ? client.scheduleDocsUrl : (client.scheduleDocsUrl ? [client.scheduleDocsUrl] : []),
+    pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : (client.pdfDocsUrl ? [client.pdfDocsUrl] : [])
   }));
 
   // Track original clients to detect changes
   const [originalClients, setOriginalClients] = useState<Client[]>(formattedInitialClients);
-  const [currentClients, setCurrentClients] = useState<Client[]>(formattedInitialClients);
+  const [clients, setClients] = useState<Client[]>(initialClients);
+  const [unsavedChanges, setUnsavedChanges] = useState<{[key: string]: Partial<Client>}>({});
 
   // Sync local state with initialClients if it changes (e.g., after global delete)
   useEffect(() => {
     setOriginalClients(formattedInitialClients);
-    setCurrentClients(formattedInitialClients);
+    setClients(formattedInitialClients);
   }, [initialClients]);
 
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Update parent component when clients change
   const updateClients = useCallback((updatedClients: Client[]) => {
-    setCurrentClients(updatedClients);
+    setClients(updatedClients);
     
     // Check if there are any changes compared to the original clients
     const changesDetected = JSON.stringify(updatedClients) !== JSON.stringify(originalClients);
     setHasChanges(changesDetected);
   }, [originalClients]);
 
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  // Search term is now properly declared
   
   // Filter clients based on search term
-  const filteredClients = currentClients.filter(client => {
+  const filteredClients = clients.filter(client => {
     if (!searchTerm) return true;
     
     const searchLower = searchTerm.toLowerCase();
@@ -81,10 +95,11 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
 
   // Robust Supabase PDF/file upload logic
   const handleFileUpload = async (clientId: string, field: 'loaDocUrl', file: File) => {
+    setUnsavedChanges(prev => ({ ...prev, [clientId]: { ...(prev[clientId] || {}) } }));
     setActionLoading(true);
     setActionError(null);
     try {
-      const client = currentClients.find(c => c.id === clientId);
+      const client = clients.find(c => c.id === clientId);
       if (!client) throw new Error('Client not found');
       const path = `${clientId}/${field}/${Date.now()}_${file.name}`;
       const url = await uploadPdf(file, path);
@@ -103,10 +118,11 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
   };
 
   const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
+    setUnsavedChanges(prev => ({ ...prev, [clientId]: { ...(prev[clientId] || {}) } }));
     setActionLoading(true);
     setActionError(null);
     try {
-      const client = currentClients.find(c => c.id === clientId);
+      const client = clients.find(c => c.id === clientId);
       if (!client) throw new Error('Client not found');
       const path = `${clientId}/${field}/${Date.now()}_${file.name}`;
       const url = await uploadPdf(file, path);
@@ -126,10 +142,11 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
   };
 
   const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
+    setUnsavedChanges(prev => ({ ...prev, [clientId]: { ...(prev[clientId] || {}) } }));
     setActionLoading(true);
     setActionError(null);
     try {
-      const client = currentClients.find(c => c.id === clientId);
+      const client = clients.find(c => c.id === clientId);
       if (!client) throw new Error('Client not found');
       const updatedUrls = (client[field] || []).filter((_, i) => i !== index);
       if (onUpdateClient) {
@@ -147,78 +164,122 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
   };
 
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
-    const updatedClients = currentClients.map(client => 
+    const updatedClients = clients.map(client => 
       client.id === clientId 
         ? { ...client, [field]: values } 
         : client
     );
-    updateClients(updatedClients);
+    setClients(updatedClients);
+    setUnsavedChanges(prev => ({
+      ...prev,
+      [clientId]: { ...(prev[clientId] || {}), [field]: values }
+    }));
   };
 
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const addNewClient = () => {
-    setActionLoading(true);
-    setActionError(null);
-    const newClient: Client = {
-      id: undefined as any, // let backend assign
-      name: '',
-      location: '',
-      policiesCount: 0,
-      products: [],
-      policyNumbers: [],
-      scheduleDocsUrl: [],
-      pdfDocsUrl: [],
-      issueDate: '',
-      deductionDate: '',
-      policyPremium: '',
-    };
-    if (onAddClient) {
-      onAddClient(newClient, (err) => {
-        setActionLoading(false);
-        if (err) setActionError(err);
-      });
-    } else {
-      setActionLoading(false);
-    }
-  };
-
-  const confirmDeleteClient = () => {
-    if (!clientToDelete) return;
-    setActionLoading(true);
-    setActionError(null);
-    if (onDeleteClient) {
-      onDeleteClient(clientToDelete.id, (err) => {
-        setActionLoading(false);
-        if (err) setActionError(err);
-        setClientToDelete(null);
-      });
-    } else {
-      setActionLoading(false);
-      setClientToDelete(null);
-    }
+  const updateClientField = (clientId: string, field: keyof Client, value: string | string[] | number) => {
+    const updatedClients = clients.map(client => 
+      client.id === clientId ? { ...client, [field]: value } : client
+    );
+    setClients(updatedClients);
+    setUnsavedChanges(prev => ({
+      ...prev,
+      [clientId]: { ...(prev[clientId] || {}), [field]: value }
+    }));
   };
 
   const initiateClientDeletion = (client: Client) => {
     setClientToDelete(client);
   };
 
-  const updateClientField = (clientId: string, field: keyof Client, value: string | number) => {
-    setActionLoading(true);
-    setActionError(null);
-    const client = currentClients.find(c => c.id === clientId);
-    if (client && onUpdateClient) {
-      onUpdateClient({ ...client, [field]: value }, (err) => {
-        setActionLoading(false);
-        if (err) setActionError(err);
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete || !onDeleteClient) return;
+
+    try {
+      setActionLoading(true);
+      setActionError(null);
+
+      await new Promise<void>((resolve, reject) => {
+        onDeleteClient(clientToDelete.id, (err) => {
+          if (err) {
+            reject(new Error(err || 'Failed to delete client'));
+          } else {
+            resolve();
+          }
+        });
       });
-    } else {
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'An error occurred during client deletion');
+    } finally {
+      // Always reset client to delete and loading state
+      setClientToDelete(null);
       setActionLoading(false);
     }
   };
 
-  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const addNewClient = () => {
+    if (!onAddClient) return;
+
+    try {
+      setActionLoading(true);
+      setActionError(null);
+
+      const newClient: Client = {
+        id: `temp_${crypto.randomUUID()}`,
+        name: '',
+        location: '',
+        policiesCount: 0,
+        products: [],
+        policyNumbers: [],
+        issueDate: '',
+        deductionDate: '',
+        policyPremium: ''
+      };
+
+      onAddClient(newClient, (err) => {
+        setActionLoading(false);
+        if (err) setActionError(err);
+      });
+    } catch (error) {
+      setActionLoading(false);
+      setActionError(error instanceof Error ? error.message : 'An error occurred');
+    }
+  };
+
+  const saveClientChanges = async (clientId: string) => {
+    const changedClient = unsavedChanges[clientId];
+    if (!changedClient) return;
+
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    try {
+      setActionLoading(true);
+      setActionError(null);
+
+      if (onUpdateClient) {
+        await new Promise<void>((resolve, reject) => {
+          onUpdateClient({
+            ...client,
+            ...changedClient
+          }, (err) => {
+            if (err) reject(new Error(err));
+            else resolve();
+          });
+        });
+      }
+
+      // Clear unsaved changes for this client
+      setUnsavedChanges(prev => {
+        const newChanges = { ...prev };
+        delete newChanges[clientId];
+        return newChanges;
+      });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4 relative">
@@ -347,7 +408,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2">R</span>
                     <Input 
-                      value={(client.policyPremium || client.policypremium || '').replace(/^[$R]/, '')}
+                      value={(client.policyPremium || '').replace(/^[$R]/, '')}
                       onChange={(e) => {
                         const value = (e.target.value || '').replace(/^[$R]/, '');
                         updateClientField(client.id, 'policyPremium', value);
@@ -357,23 +418,40 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   </div>
                 </TableCell>
                 <TableCell>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => initiateClientDeletion(client)}
-                          className="text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Remove client</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <div className="flex items-center space-x-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => initiateClientDeletion(client)}
+                            disabled={actionLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete Client</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    {unsavedChanges[client.id] && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              onClick={() => saveClientChanges(client.id)}
+                              disabled={actionLoading}
+                            >
+                              Save Changes
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Save unsaved changes for this client</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

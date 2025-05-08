@@ -31,7 +31,7 @@ interface Client {
 const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const currentYear = new Date().getFullYear();
-  const [clients, setClients] = useState([]);
+  const [clients, setClients] = useState<Client[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
@@ -66,9 +66,12 @@ const Dashboard = () => {
 
   // Summary logic (aggregate by name/location)
   const summaryMap = new Map();
-  clients.forEach(client => {
+  const clientSummaries = (() => {
+    if (!clients || clients.length === 0) return [];
+    
+    clients.forEach(client => {
     const key = `${client.name}||${client.location}`;
-    const premium = parseFloat(((client.policyPremium || client.policypremium || '').replace(/[^0-9.]/g, ''))) || 0;
+    const premium = parseFloat(((client.policyPremium || '').replace(/[^0-9.]/g, ''))) || 0;
     if (!summaryMap.has(key)) {
       summaryMap.set(key, {
         name: client.name,
@@ -82,7 +85,8 @@ const Dashboard = () => {
       entry.totalPremium += premium;
     }
   });
-  const clientSummaries = Array.from(summaryMap.values());
+    return Array.from(summaryMap.values());
+  })();
 
   // Update clients after add/update/delete
   const reloadClients = () => {
@@ -152,29 +156,30 @@ const Dashboard = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <div className="glass-morphism rounded-lg p-4">
                   <h3 className="text-muted-foreground text-sm mb-1">Total Clients</h3>
-                  <p className="text-2xl font-bold">{clients.length}</p>
+                  <p className="text-2xl font-bold">{clients?.length || 0}</p>
                 </div>
                 <div className="glass-morphism rounded-lg p-4">
                   <h3 className="text-muted-foreground text-sm mb-1">Total Policies</h3>
-                  <p className="text-2xl font-bold">{clients.reduce((sum, client) => sum + client.policiesCount, 0)}</p>
+                  <p className="text-2xl font-bold">{clients?.reduce((sum, client) => sum + (Number(client.policiesCount) || 0), 0) || 0}</p>
                 </div>
                 <div className="glass-morphism rounded-lg p-4">
                   <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
-                  <p className="text-2xl font-bold">R{clients.reduce((sum, client) => {
-                    const premium = ((client.policyPremium || client.policypremium || '')).replace(/[^0-9.]/g, '');
-                    return sum + (parseFloat(premium) || 0);
+                  <p className="text-2xl font-bold">R{clients?.reduce((sum, client) => {
+                    const premium = ((client.policyPremium || '')).replace(/[^0-9.]/g, '');
+                    const premiumNum = parseFloat(premium);
+                    return sum + (isNaN(premiumNum) ? 0 : premiumNum);
                   }, 0).toLocaleString()}</p>
                 </div>
                 <div className="glass-morphism rounded-lg p-4">
                   <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
-                  <p className="text-2xl font-bold">{new Set(clients.flatMap(client => 
+                  <p className="text-2xl font-bold">{new Set(clients?.flatMap(client => 
                     Array.isArray(client.products) ? client.products : []
-                  )).size}</p>
+                  ) || []).size}</p>
                 </div>
               </div>
               {/* Client table with improved styling */}
               <ClientTable
-                initialClients={clients}
+                initialClients={clients || []}
                 onAddClient={async (client, cb) => {
                   try {
                     setLoading(true);

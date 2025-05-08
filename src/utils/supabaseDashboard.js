@@ -62,6 +62,12 @@ function mapClientForDb(client) {
 export async function addMonthlyClient(monthIndex, year, client) {
   const table = getMonthlyTableName(monthIndex);
   const dbClient = mapClientForDb(client);
+  
+  // Remove temporary ID if it exists
+  if (dbClient.id && dbClient.id.startsWith('temp_')) {
+    delete dbClient.id;
+  }
+
   const { data, error } = await supabase
     .from(table)
     .insert([{ ...dbClient, year }])
@@ -107,9 +113,10 @@ export async function fetchAllClients() {
 }
 
 export async function addClient(client) {
+  const dbClient = mapClientForDb(client);
   const { data, error } = await supabase
     .from('clients')
-    .insert([client])
+    .insert([dbClient])
     .select();
   if (error) throw new Error(error.message);
   return data?.[0];

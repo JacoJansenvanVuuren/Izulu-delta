@@ -10,7 +10,7 @@ interface MultiEntryFieldProps {
   placeholder?: string;
 }
 
-const MultiEntryField = ({ values, onChange, placeholder }: MultiEntryFieldProps) => {
+const MultiEntryField = ({ values = [], onChange, placeholder }: MultiEntryFieldProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentInput, setCurrentInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
