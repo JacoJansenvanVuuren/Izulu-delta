@@ -10,7 +10,12 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     fs: {
-      allow: ['.'],
+      allow: ['.', path.resolve(__dirname, 'src')],
+    },
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   },
   plugins: [
@@ -57,5 +62,12 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode)
+  },
+  preview: {
+    port: 8080,
+    strictPort: true,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    }
   }
 }));
