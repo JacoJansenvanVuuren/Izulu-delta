@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ClientTable from '@/components/ClientTable';
 import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
 import MonthSelector from '@/components/MonthSelector';
@@ -32,11 +32,15 @@ interface Client {
 }
 
 const Dashboard = () => {
+  // Scroll position tracking
+  const scrollPositionRef = useRef(0);
+  
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const currentYear = new Date().getFullYear();
   const [clients, setClients] = useState<Client[] | null>(null);
   const [globalClients, setGlobalClients] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // Separate flag for initial load
   const [error, setError] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
   // Cache for monthly clients: { ["month-year"]: Client[] }
@@ -44,12 +48,30 @@ const Dashboard = () => {
   // Local deletion tracking
   const [deletedClientNames, setDeletedClientNames] = useState<Set<string>>(new Set());
 
+  // Function to save scroll position
+  const saveScrollPosition = () => {
+    scrollPositionRef.current = window.scrollY;
+  };
+
+  // Function to restore scroll position
+  const restoreScrollPosition = () => {
+    setTimeout(() => {
+      window.scrollTo(0, scrollPositionRef.current);
+    }, 0);
+  };
+
+  // Modified setSelectedMonth to save scroll position
+  const handleMonthChange = (newMonth: number) => {
+    saveScrollPosition();
+    setSelectedMonth(newMonth);
+  };
+
   // Fetch clients for the selected month/year with cache
   useEffect(() => {
     const cacheKey = `${selectedMonth}-${currentYear}`;
     if (clientsCache[cacheKey]) {
       setClients(clientsCache[cacheKey]);
-      setLoading(false);
+      if (initialLoading) setInitialLoading(false);
       // Fetch in background to update cache
       fetchMonthlyClients(selectedMonth, currentYear)
         .then(data => {
@@ -59,10 +81,11 @@ const Dashboard = () => {
           );
           setClientsCache(prev => ({ ...prev, [cacheKey]: filteredData }));
           setClients(filteredData);
+          restoreScrollPosition();
         })
         .catch(err => setError(err.message));
     } else {
-      setLoading(true);
+      if (!initialLoading) setLoading(true);
       setError(null);
       fetchMonthlyClients(selectedMonth, currentYear)
         .then(data => {
@@ -72,15 +95,21 @@ const Dashboard = () => {
           );
           setClientsCache(prev => ({ ...prev, [cacheKey]: filteredData }));
           setClients(filteredData);
+          setInitialLoading(false);
+          setLoading(false);
+          restoreScrollPosition();
         })
-        .catch(err => setError(err.message))
-        .finally(() => setLoading(false));
+        .catch(err => {
+          setError(err.message);
+          setInitialLoading(false);
+          setLoading(false);
+        });
     }
   }, [selectedMonth, currentYear, deletedClientNames]);
 
   // Fetch global clients for the summary view
   useEffect(() => {
-    if (showSummary) {
+    if (showSummary && (!globalClients || globalClients.length === 0)) {
       setLoading(true);
       fetchAllClients()
         .then(data => {
@@ -90,14 +119,15 @@ const Dashboard = () => {
             !deletedClientNames.has(client.name)
           );
           setGlobalClients(filteredData);
+          setLoading(false);
         })
         .catch(err => {
           console.error("Error fetching global clients:", err);
           setError(err.message);
-        })
-        .finally(() => setLoading(false));
+          setLoading(false);
+        });
     }
-  }, [showSummary, deletedClientNames]);
+  }, [showSummary, globalClients, deletedClientNames]);
 
   // Summary logic (aggregate by name/location)
   const summaryMap = new Map();
@@ -121,10 +151,11 @@ const Dashboard = () => {
     return Array.from(summaryMap.values());
   })();
 
-  // Update clients after add/update/delete
-  const reloadClients = async () => {
-    setLoading(true);
-    setError(null);
+  // Update clients after add/update/delete - now preserves scroll position
+  const reloadClients = async (preserveScroll = true) => {
+    if (preserveScroll) {
+      saveScrollPosition();
+    }
     
     try {
       if (showSummary) {
@@ -147,14 +178,16 @@ const Dashboard = () => {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (preserveScroll) {
+        restoreScrollPosition();
+      }
     }
   };
 
   // Handle deleting a client from the global client table
   const handleDeleteGlobalClient = async (clientName: string) => {
     try {
-      setLoading(true);
+      saveScrollPosition();
       await deleteClient(clientName);
       
       // Update local state immediately
@@ -178,15 +211,15 @@ const Dashboard = () => {
         const updatedClients = clients.filter(client => client.name !== clientName);
         setClients(updatedClients);
       }
+      
+      restoreScrollPosition();
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
   // Inline loading indicator for monthly view changes
-  const inlineLoading = loading && (
+  const inlineLoading = initialLoading && (
     <div className="flex justify-center items-center py-12">
       <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
       <span className="ml-2 text-primary/70">Loading...</span>
@@ -211,7 +244,7 @@ const Dashboard = () => {
             <h1 className="text-3xl font-bold text-gradient mb-4 md:mb-0">
               {showSummary ? 'Global Clients Table' : 'Monthly Tracking'}
             </h1>
-            {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
+            {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={handleMonthChange} />}
           </div>
           
           {/* Inline loading indicator */}
@@ -253,8 +286,9 @@ const Dashboard = () => {
                   initialClients={clients || []}
                   onAddClient={async (client, cb) => {
                     try {
+                      saveScrollPosition();
                       await addMonthlyClient(selectedMonth, currentYear, client);
-                      reloadClients();
+                      await reloadClients(true);
                       if (cb) cb();
                     } catch (err: any) {
                       setError(err.message);
@@ -263,8 +297,9 @@ const Dashboard = () => {
                   }}
                   onUpdateClient={async (client, cb) => {
                     try {
+                      saveScrollPosition();
                       await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
-                      reloadClients();
+                      await reloadClients(true);
                       if (cb) cb();
                     } catch (err: any) {
                       setError(err.message);
@@ -273,8 +308,9 @@ const Dashboard = () => {
                   }}
                   onDeleteClient={async (id, cb) => {
                     try {
+                      saveScrollPosition();
                       await deleteMonthlyClient(selectedMonth, currentYear, id);
-                      reloadClients();
+                      await reloadClients(true);
                       if (cb) cb();
                     } catch (err: any) {
                       setError(err.message);

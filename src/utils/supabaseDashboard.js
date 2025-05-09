@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabase';
 
 // Helper to get table name for a month and year (e.g. 'clients_january')
@@ -98,7 +99,7 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   if (error) throw new Error(error.message);
   
   // Also update in the global clients table
-  await updateGlobalClientFromMonthly(updates);
+  await updateGlobalClientFromMonthly({...updates, name: updates.name});
   
   return data?.[0];
 }
