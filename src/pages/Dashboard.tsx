@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import ClientTable from '@/components/ClientTable';
 import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
@@ -14,6 +13,7 @@ import {
   deleteClient
 } from '../utils/supabaseDashboard';
 import { toast } from "@/components/ui/use-toast";
+import { Loader2 } from 'lucide-react';
 
 // Define Client interface (matching the one in ClientTable.tsx)
 interface Client {
@@ -207,118 +207,119 @@ const Dashboard = () => {
             </h1>
             {!showSummary && <MonthSelector selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} />}
           </div>
-          {/* Stats cards */}
-          {!showSummary && (
+          
+          {/* Inline loading indicator */}
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+              <span className="ml-2 text-primary/70">Loading...</span>
+            </div>
+          ) : error ? (
+            <div className="p-6 text-center text-red-500">Error: {error}</div>
+          ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="glass-morphism rounded-lg p-4">
-                  <h3 className="text-muted-foreground text-sm mb-1">Total Clients</h3>
-                  <p className="text-2xl font-bold">{clients?.length || 0}</p>
+              {/* Stats cards */}
+              {!showSummary && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  <div className="glass-morphism rounded-lg p-4">
+                    <h3 className="text-muted-foreground text-sm mb-1">Total Clients</h3>
+                    <p className="text-2xl font-bold">{clients?.length || 0}</p>
+                  </div>
+                  <div className="glass-morphism rounded-lg p-4">
+                    <h3 className="text-muted-foreground text-sm mb-1">Total Policies</h3>
+                    <p className="text-2xl font-bold">{clients?.reduce((sum, client) => sum + (Number(client.policiesCount) || 0), 0) || 0}</p>
+                  </div>
+                  <div className="glass-morphism rounded-lg p-4">
+                    <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
+                    <p className="text-2xl font-bold">R{clients?.reduce((sum, client) => {
+                      const premium = ((client.policyPremium || '')).replace(/[^0-9.]/g, '');
+                      const premiumNum = parseFloat(premium);
+                      return sum + (isNaN(premiumNum) ? 0 : premiumNum);
+                    }, 0).toLocaleString()}</p>
+                  </div>
+                  <div className="glass-morphism rounded-lg p-4">
+                    <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
+                    <p className="text-2xl font-bold">{new Set(clients?.flatMap(client => 
+                      Array.isArray(client.products) ? client.products : []
+                    ) || []).size}</p>
+                  </div>
                 </div>
-                <div className="glass-morphism rounded-lg p-4">
-                  <h3 className="text-muted-foreground text-sm mb-1">Total Policies</h3>
-                  <p className="text-2xl font-bold">{clients?.reduce((sum, client) => sum + (Number(client.policiesCount) || 0), 0) || 0}</p>
-                </div>
-                <div className="glass-morphism rounded-lg p-4">
-                  <h3 className="text-muted-foreground text-sm mb-1">Total Premium</h3>
-                  <p className="text-2xl font-bold">R{clients?.reduce((sum, client) => {
-                    const premium = ((client.policyPremium || '')).replace(/[^0-9.]/g, '');
-                    const premiumNum = parseFloat(premium);
-                    return sum + (isNaN(premiumNum) ? 0 : premiumNum);
-                  }, 0).toLocaleString()}</p>
-                </div>
-                <div className="glass-morphism rounded-lg p-4">
-                  <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
-                  <p className="text-2xl font-bold">{new Set(clients?.flatMap(client => 
-                    Array.isArray(client.products) ? client.products : []
-                  ) || []).size}</p>
-                </div>
-              </div>
+              )}
+              
               {/* Client table with improved styling */}
-              <ClientTable
-                initialClients={clients || []}
-                onAddClient={async (client, cb) => {
-                  try {
-                    setLoading(true);
-                    setError(null);
-                    await addMonthlyClient(selectedMonth, currentYear, client);
-                    reloadClients();
-                    if (cb) cb();
-                    
-                    toast({
-                      title: "Client Added",
-                      description: "New client has been added successfully",
-                    });
-                  } catch (err: any) {
-                    setError(err.message);
-                    toast({
-                      title: "Error",
-                      description: err.message,
-                      variant: "destructive"
-                    });
-                    if (cb) cb(err.message);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                onUpdateClient={async (client, cb) => {
-                  try {
-                    setLoading(true);
-                    setError(null);
-                    await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
-                    reloadClients();
-                    if (cb) cb();
-                    
-                    toast({
-                      title: "Client Updated",
-                      description: "Client information has been updated",
-                    });
-                  } catch (err: any) {
-                    setError(err.message);
-                    toast({
-                      title: "Error",
-                      description: err.message,
-                      variant: "destructive"
-                    });
-                    if (cb) cb(err.message);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                onDeleteClient={async (id, cb) => {
-                  try {
-                    setLoading(true);
-                    setError(null);
-                    await deleteMonthlyClient(selectedMonth, currentYear, id);
-                    reloadClients();
-                    if (cb) cb();
-                    
-                    toast({
-                      title: "Client Deleted",
-                      description: "Client has been removed successfully",
-                    });
-                  } catch (err: any) {
-                    setError(err.message);
-                    toast({
-                      title: "Error",
-                      description: err.message,
-                      variant: "destructive"
-                    });
-                    if (cb) cb(err.message);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                selectedMonth={selectedMonth}
-                currentYear={currentYear}
-              />
+              {!showSummary ? (
+                <ClientTable
+                  initialClients={clients || []}
+                  onAddClient={async (client, cb) => {
+                    try {
+                      await addMonthlyClient(selectedMonth, currentYear, client);
+                      reloadClients();
+                      if (cb) cb();
+                      
+                      toast({
+                        title: "Client Added",
+                        description: "New client has been added successfully",
+                      });
+                    } catch (err: any) {
+                      setError(err.message);
+                      toast({
+                        title: "Error",
+                        description: err.message,
+                        variant: "destructive"
+                      });
+                      if (cb) cb(err.message);
+                    }
+                  }}
+                  onUpdateClient={async (client, cb) => {
+                    try {
+                      await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
+                      reloadClients();
+                      if (cb) cb();
+                      
+                      toast({
+                        title: "Client Updated",
+                        description: "Client information has been updated",
+                      });
+                    } catch (err: any) {
+                      setError(err.message);
+                      toast({
+                        title: "Error",
+                        description: err.message,
+                        variant: "destructive"
+                      });
+                      if (cb) cb(err.message);
+                    }
+                  }}
+                  onDeleteClient={async (id, cb) => {
+                    try {
+                      await deleteMonthlyClient(selectedMonth, currentYear, id);
+                      reloadClients();
+                      if (cb) cb();
+                      
+                      toast({
+                        title: "Client Deleted",
+                        description: "Client has been removed successfully",
+                      });
+                    } catch (err: any) {
+                      setError(err.message);
+                      toast({
+                        title: "Error",
+                        description: err.message,
+                        variant: "destructive"
+                      });
+                      if (cb) cb(err.message);
+                    }
+                  }}
+                  selectedMonth={selectedMonth}
+                  currentYear={currentYear}
+                />
+              ) : (
+                <ClientsSummaryTable 
+                  summaries={clientSummaries}
+                  onDeleteClient={handleDeleteGlobalClient}
+                />
+              )}
             </>
-          )}
-          {showSummary && (
-            <ClientsSummaryTable 
-              summaries={clientSummaries}
-              onDeleteClient={handleDeleteGlobalClient}
-            />
           )}
         </div>
       </div>

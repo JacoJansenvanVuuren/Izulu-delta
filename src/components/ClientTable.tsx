@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { uploadPdf } from '../utils/supabaseDashboard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -467,14 +466,14 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         </Table>
       </div>
 
-      {/* Save Changes Button (Bottom Right) */}
+      {/* Save Changes Button (Fixed Position) */}
       {hasUnsavedChanges && (
-        <div className="flex justify-end mt-4">
+        <div className="fixed bottom-6 right-6 z-50">
           <Button
             onClick={saveAllChanges}
             disabled={actionLoading}
             variant="outline"
-            className="text-white border-white/20 hover:bg-white/10"
+            className="text-white border-white/20 hover:bg-white/10 shadow-lg"
           >
             <Save className="h-4 w-4 mr-2" /> Save Changes
           </Button>
