@@ -38,7 +38,7 @@ const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const currentYear = new Date().getFullYear();
   const [clients, setClients] = useState<Client[] | null>(null);
-  const [globalClients, setGlobalClients] = useState<any[] | null>(null);
+  const [globalClients, setGlobalClients] = useState<Client[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true); // Separate flag for initial load
   const [error, setError] = useState(null);
@@ -47,6 +47,19 @@ const Dashboard = () => {
   const [clientsCache, setClientsCache] = useState<Record<string, Client[]>>({});
   // Local deletion tracking
   const [deletedClientNames, setDeletedClientNames] = useState<Set<string>>(new Set());
+
+  // Function to update global clients state
+  const updateGlobalClientsState = useCallback(async () => {
+    try {
+      const clients = await fetchAllClients();
+      const filteredClients = clients.filter((client: any) => 
+        !deletedClientNames.has(client.name)
+      );
+      setGlobalClients(filteredClients);
+    } catch (error) {
+      console.error('Error fetching global clients:', error);
+    }
+  }, [deletedClientNames]);
 
   // Function to save scroll position
   const saveScrollPosition = () => {
@@ -180,7 +193,7 @@ const Dashboard = () => {
   })();
 
   // Update clients after add/update/delete - now preserves scroll position
-  const reloadClients = async (preserveScroll = true) => {
+  const reloadClients = async (preserveScroll = true, optimisticUpdate?: Client) => {
     if (preserveScroll) {
       saveScrollPosition();
     }
@@ -195,9 +208,31 @@ const Dashboard = () => {
         );
         setGlobalClients(filteredData);
       } else {
+        // If an optimistic update is provided, immediately update the local state
+        if (optimisticUpdate && clients) {
+          const updatedClients = clients.map(client => 
+            client.id === optimisticUpdate.id ? optimisticUpdate : client
+          );
+          setClients(updatedClients);
+          setClientsCache(prev => ({
+            ...prev, 
+            [`${selectedMonth}-${currentYear}`]: updatedClients
+          }));
+        }
+
         const data = await fetchMonthlyClients(selectedMonth, currentYear);
         // Filter out any clients that were deleted
-        const filteredData = data.filter((client: any) => 
+        const filteredData = data.map((client: any) => ({
+          ...client,
+          policiesCount: client.policiescount || 0,
+          policyPremium: client.policypremium || '',
+          policyNumbers: client.policynumbers || [],
+          scheduleDocsUrl: client.scheduledocsurl || [],
+          pdfDocsUrl: client.pdfdocsurl || [],
+          deductionDate: client.deductiondate || '',
+          issueDate: client.issuedate || '',
+          loaDocUrl: client.loadocurl || ''
+        })).filter((client: Client) => 
           !deletedClientNames.has(client.name)
         );
         
@@ -327,35 +362,134 @@ const Dashboard = () => {
                 <ClientTable
                   initialClients={clients || []}
                   onAddClient={async (client, cb) => {
+                    // Declare newClient outside try block
+                    const newClient = {
+                      ...client,
+                      id: crypto.randomUUID(), // Temporary ID
+                      policiesCount: client.policiesCount || 0,
+                    };
+
                     try {
                       saveScrollPosition();
+                      
+                      // Immediately update local state
+                      if (clients) {
+                        const updatedClients = [...clients, newClient];
+                        setClients(updatedClients);
+                        setClientsCache(prev => ({
+                          ...prev, 
+                          [`${selectedMonth}-${currentYear}`]: updatedClients
+                        }));
+                      }
+
+                      // Actual database operation
                       await addMonthlyClient(selectedMonth, currentYear, client);
                       await reloadClients(true);
                       if (cb) cb();
                     } catch (err: any) {
                       setError(err.message);
+                      // Revert optimistic update
+                      if (clients) {
+                        const filteredClients = clients.filter(c => c.id !== newClient.id);
+                        setClients(filteredClients);
+                        setClientsCache(prev => ({
+                          ...prev, 
+                          [`${selectedMonth}-${currentYear}`]: filteredClients
+                        }));
+                      }
                       if (cb) cb(err.message);
                     }
                   }}
                   onUpdateClient={async (client, cb) => {
+                    // Optimistic update immediately
+                    const optimisticUpdateFn = () => {
+                      if (clients) {
+                        const updatedClients = clients.map(c => 
+                          c.id === client.id ? { ...c, ...client } : c
+                        );
+                        setClients(updatedClients);
+                        setClientsCache(prev => ({
+                          ...prev, 
+                          [`${selectedMonth}-${currentYear}`]: updatedClients
+                        }));
+                      }
+
+                      // Optimistically update global clients if they exist
+                      if (globalClients) {
+                        const updatedGlobalClients = globalClients.map(gc => 
+                          gc.name === client.name ? { ...gc, ...client } : gc
+                        );
+                        setGlobalClients(updatedGlobalClients);
+                      }
+                    };
+
                     try {
                       saveScrollPosition();
-                      await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
-                      await reloadClients(true);
+                      
+                      // Perform optimistic update immediately
+                      optimisticUpdateFn();
+
+                      // Start database update in background
+                      const updatePromise = updateMonthlyClient(selectedMonth, currentYear, client.id, client);
+
+                      // Optional: add a timeout to prevent hanging
+                      const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Update timeout')), 5000)
+                      );
+
+                      // Race between update and timeout
+                      const updatedServerClient = await Promise.race([
+                        updatePromise,
+                        timeoutPromise
+                      ]);
+
+                      // Trigger global clients refresh if needed
+                      if (showSummary) {
+                        await updateGlobalClientsState();
+                      }
+
                       if (cb) cb();
                     } catch (err: any) {
-                      setError(err.message);
+                      setError(err.message || 'Update failed');
+                      
+                      // Revert optimistic update
+                      await reloadClients(true);
+                      
                       if (cb) cb(err.message);
                     }
                   }}
                   onDeleteClient={async (id, cb) => {
+                    // Find the client to be deleted for potential rollback
+                    const clientToDelete = clients?.find(c => c.id === id);
+
                     try {
                       saveScrollPosition();
+
+                      // Optimistic update
+                      if (clients) {
+                        const updatedClients = clients.filter(client => client.id !== id);
+                        setClients(updatedClients);
+                        setClientsCache(prev => ({
+                          ...prev, 
+                          [`${selectedMonth}-${currentYear}`]: updatedClients
+                        }));
+                      }
+
+                      // Actual database operation
                       await deleteMonthlyClient(selectedMonth, currentYear, id);
                       await reloadClients(true);
                       if (cb) cb();
                     } catch (err: any) {
                       setError(err.message);
+                      // Revert optimistic update
+                      if (clientToDelete && clients) {
+                        const updatedClients = [...clients, clientToDelete];
+                        setClients(updatedClients);
+                        setClientsCache(prev => ({
+                          ...prev, 
+                          [`${selectedMonth}-${currentYear}`]: updatedClients
+                        }));
+                      }
                       if (cb) cb(err.message);
                     }
                   }}

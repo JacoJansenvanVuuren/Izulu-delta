@@ -152,7 +152,7 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   Object.entries(fieldMappings).forEach(([snakeCaseField, variations]) => {
     const [camelCaseField, altSnakeCaseField] = variations;
     
-    // Prioritize camelCase, then snake_case, then existing record
+    // Prioritize updates first, then existing record
     const fieldValue = updates[camelCaseField] !== undefined 
       ? updates[camelCaseField] 
       : (updates[altSnakeCaseField] !== undefined 
@@ -181,10 +181,23 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   
   console.log('Update Result:', JSON.stringify(data));
 
+  // Ensure the returned data matches the updates
+  const updatedRecord = data?.[0];
+  if (updatedRecord) {
+    // Verify critical fields are preserved
+    Object.entries(fieldMappings).forEach(([snakeCaseField, variations]) => {
+      const [camelCaseField] = variations;
+      if (updates[camelCaseField] !== undefined && 
+          updatedRecord[snakeCaseField] !== updates[camelCaseField]) {
+        console.warn(`Field ${snakeCaseField} not updated correctly`);
+      }
+    });
+  }
+
   // Also update in the global clients table
   await updateGlobalClientFromMonthly({...updates, name: updates.name});
   
-  return data?.[0];
+  return updatedRecord;
 }
 
 // Delete a row in a monthly table
@@ -215,40 +228,76 @@ export async function deleteMonthlyClient(monthIndex, year, id) {
 }
 
 // Helper function to update or create a client in the global clients table
-async function updateGlobalClientFromMonthly(client) {
-  if (!client.name) return;
-  
-  console.log('Updating global client from monthly:', client.name);
-  
-  // Check if client with this name already exists in global table
-  const { data: existingClients } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('name', client.name);
-  
-  // Get all monthly data for this client to aggregate
-  const { data: allMonthlyData } = await getAllMonthlyDataForClient(client.name);
-  
-  if (!allMonthlyData || allMonthlyData.length === 0) return;
-  
-  // Aggregate data from all months
-  const aggregatedData = aggregateClientData(allMonthlyData);
-  
-  // Update or insert into global clients table
-  if (existingClients && existingClients.length > 0) {
-    console.log('Updating existing client in global table:', client.name);
-    await supabase
+export async function updateGlobalClientFromMonthly(monthlyClient) {
+  // Ensure we have a name to work with
+  if (!monthlyClient.name) {
+    console.warn('No name provided for global client update');
+    return null;
+  }
+
+  try {
+    // Fetch all monthly data for this client across all months
+    const allMonthlyData = await getAllMonthlyDataForClient(monthlyClient.name);
+
+    // Aggregate data from all months
+    const aggregatedData = aggregateClientData(allMonthlyData.data);
+
+    // Prepare update data with aggregated information
+    const updateData = {
+      name: monthlyClient.name,
+      location: aggregatedData.location || monthlyClient.location || '',
+      policy_premium: aggregatedData.policy_premium || monthlyClient.policyPremium || '',
+      policies_count: aggregatedData.policies_count || monthlyClient.policiesCount || 0,
+      products: aggregatedData.products || monthlyClient.products || [],
+      policy_numbers: aggregatedData.policy_numbers || monthlyClient.policyNumbers || [],
+    };
+
+    // First, check if the client exists in the global clients table
+    const { data: existingClients, error: fetchError } = await supabase
       .from('clients')
-      .update(aggregatedData)
-      .eq('name', client.name);
-  } else {
-    console.log('Creating new client in global table:', client.name);
-    await supabase
-      .from('clients')
-      .insert([{ 
-        name: client.name,
-        ...aggregatedData 
-      }]);
+      .select('*')
+      .eq('name', monthlyClient.name)
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error fetching global client:', fetchError);
+      return null;
+    }
+
+    let result;
+    if (existingClients && existingClients.length > 0) {
+      // Update existing client with aggregated data
+      const { data, error } = await supabase
+        .from('clients')
+        .update(updateData)
+        .eq('name', monthlyClient.name)
+        .select();
+
+      if (error) {
+        console.error('Error updating global client:', error);
+        return null;
+      }
+
+      result = data?.[0];
+    } else {
+      // Create new global client with aggregated data
+      const { data, error } = await supabase
+        .from('clients')
+        .insert(updateData)
+        .select();
+
+      if (error) {
+        console.error('Error creating global client:', error);
+        return null;
+      }
+
+      result = data?.[0];
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Unexpected error in updateGlobalClientFromMonthly:', err);
+    return null;
   }
 }
 
@@ -305,41 +354,38 @@ function aggregateClientData(monthlyData) {
     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
   )[0];
   
-  // Initialize with location from the latest record
+  // Initialize result with comprehensive fields
   const result = {
-    location: latestRecord.location,
-    products: [],
+    location: latestRecord.location || '',
+    products: new Set(),
     policies_count: 0,
-    policy_numbers: [],
+    policy_numbers: new Set(),
     policy_premium: 0,
+    deduction_dates: new Set(),
+    issue_dates: new Set(),
+    schedule_docs_urls: new Set(),
+    pdf_docs_urls: new Set(),
+    loa_doc_urls: new Set()
   };
   
-  // Aggregate numerical values and arrays
+  // Aggregate data from all records
   monthlyData.forEach(record => {
-    // Sum up policy count
+    // Aggregate numerical values
     result.policies_count += (record.policiescount || 0);
     
-    // Combine products without duplicates
+    // Combine products
     if (record.products) {
       const products = Array.isArray(record.products) ? record.products : [];
-      products.forEach(product => {
-        if (!result.products.includes(product)) {
-          result.products.push(product);
-        }
-      });
+      products.forEach(product => result.products.add(product));
     }
     
-    // Combine policy numbers without duplicates
+    // Combine policy numbers
     if (record.policynumbers) {
       const policyNumbers = Array.isArray(record.policynumbers) ? record.policynumbers : [];
-      policyNumbers.forEach(number => {
-        if (!result.policy_numbers.includes(number)) {
-          result.policy_numbers.push(number);
-        }
-      });
+      policyNumbers.forEach(number => result.policy_numbers.add(number));
     }
     
-    // Sum up policy premium (convert from string if needed)
+    // Sum up policy premium
     if (record.policypremium) {
       const premiumStr = String(record.policypremium).replace(/[^0-9.]/g, '');
       const premium = parseFloat(premiumStr);
@@ -347,9 +393,32 @@ function aggregateClientData(monthlyData) {
         result.policy_premium += premium;
       }
     }
+    
+    // Collect additional metadata
+    if (record.deductiondate) result.deduction_dates.add(record.deductiondate);
+    if (record.issuedate) result.issue_dates.add(record.issuedate);
+    if (record.scheduledocsurl) {
+      const urls = Array.isArray(record.scheduledocsurl) ? record.scheduledocsurl : [record.scheduledocsurl];
+      urls.forEach(url => result.schedule_docs_urls.add(url));
+    }
+    if (record.pdfdocsurl) {
+      const urls = Array.isArray(record.pdfdocsurl) ? record.pdfdocsurl : [record.pdfdocsurl];
+      urls.forEach(url => result.pdf_docs_urls.add(url));
+    }
+    if (record.loadocurl) result.loa_doc_urls.add(record.loadocurl);
   });
   
-  return result;
+  // Convert Sets to arrays for storage
+  return {
+    ...result,
+    products: Array.from(result.products),
+    policy_numbers: Array.from(result.policy_numbers),
+    deduction_dates: Array.from(result.deduction_dates),
+    issue_dates: Array.from(result.issue_dates),
+    schedule_docs_urls: Array.from(result.schedule_docs_urls),
+    pdf_docs_urls: Array.from(result.pdf_docs_urls),
+    loa_doc_urls: Array.from(result.loa_doc_urls)
+  };
 }
 
 // CRUD for global clients table
