@@ -302,46 +302,6 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
-  const handleDeleteAllClients = async () => {
-    if (!onDeleteClient) return;
-    
-    try {
-      setActionLoading(true);
-      setActionError(null);
-      
-      // Confirm with user
-      if (!confirm("Are you sure you want to delete ALL clients for this month? This action cannot be undone.")) {
-        setActionLoading(false);
-        return;
-      }
-      
-      const deletePromises = clients.map(client => 
-        new Promise<void>((resolve, reject) => {
-          onDeleteClient(client.id, (err) => {
-            if (err) reject(new Error(err));
-            else resolve();
-          });
-        })
-      );
-      
-      await Promise.all(deletePromises);
-      
-      toast({
-        title: "All Clients Deleted",
-        description: `All clients for the selected month have been deleted`,
-      });
-    } catch (error: any) {
-      setActionError(error instanceof Error ? error.message : 'An error occurred');
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: "destructive"
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-4 relative">
       {/* Error message for actions */}
@@ -368,15 +328,6 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
             disabled={actionLoading}
           >
             <Plus className="h-4 w-4 mr-2" /> Add New Row
-          </Button>
-          
-          <Button 
-            onClick={handleDeleteAllClients} 
-            variant="destructive" 
-            className="w-full sm:w-auto"
-            disabled={actionLoading || clients.length === 0}
-          >
-            <Trash2 className="h-4 w-4 mr-2" /> Delete All
           </Button>
         </div>
       </div>
@@ -516,15 +467,16 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         </Table>
       </div>
 
-      {/* Save Changes Button (Bottom Left) */}
+      {/* Save Changes Button (Bottom Right) */}
       {hasUnsavedChanges && (
-        <div className="flex justify-start mt-4">
+        <div className="flex justify-end mt-4">
           <Button
             onClick={saveAllChanges}
             disabled={actionLoading}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            variant="outline"
+            className="text-white border-white/20 hover:bg-white/10"
           >
-            <Save className="h-4 w-4 mr-2" /> Save All Changes
+            <Save className="h-4 w-4 mr-2" /> Save Changes
           </Button>
         </div>
       )}
