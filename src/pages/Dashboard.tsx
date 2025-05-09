@@ -38,7 +38,7 @@ const Dashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const currentYear = new Date().getFullYear();
   const [clients, setClients] = useState<Client[] | null>(null);
-  const [globalClients, setGlobalClients] = useState<Client[] | null>(null);
+  const [globalClients, setGlobalClients] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true); // Separate flag for initial load
   const [error, setError] = useState(null);
@@ -47,19 +47,6 @@ const Dashboard = () => {
   const [clientsCache, setClientsCache] = useState<Record<string, Client[]>>({});
   // Local deletion tracking
   const [deletedClientNames, setDeletedClientNames] = useState<Set<string>>(new Set());
-
-  // Function to update global clients state
-  const updateGlobalClientsState = useCallback(async () => {
-    try {
-      const clients = await fetchAllClients();
-      const filteredClients = clients.filter((client: any) => 
-        !deletedClientNames.has(client.name)
-      );
-      setGlobalClients(filteredClients);
-    } catch (error) {
-      console.error('Error fetching global clients:', error);
-    }
-  }, [deletedClientNames]);
 
   // Function to save scroll position
   const saveScrollPosition = () => {
@@ -413,14 +400,6 @@ const Dashboard = () => {
                           [`${selectedMonth}-${currentYear}`]: updatedClients
                         }));
                       }
-
-                      // Optimistically update global clients if they exist
-                      if (globalClients) {
-                        const updatedGlobalClients = globalClients.map(gc => 
-                          gc.name === client.name ? { ...gc, ...client } : gc
-                        );
-                        setGlobalClients(updatedGlobalClients);
-                      }
                     };
 
                     try {
@@ -442,11 +421,6 @@ const Dashboard = () => {
                         updatePromise,
                         timeoutPromise
                       ]);
-
-                      // Trigger global clients refresh if needed
-                      if (showSummary) {
-                        await updateGlobalClientsState();
-                      }
 
                       if (cb) cb();
                     } catch (err: any) {

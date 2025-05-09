@@ -32,10 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(username);
       localStorage.setItem('auth', 'true');
       localStorage.setItem('user', username);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
+      // Removed login success toast
       return true;
     } else {
       toast({
