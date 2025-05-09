@@ -85,7 +85,7 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   const table = getMonthlyTableName(monthIndex);
   const dbUpdates = mapClientForDb(updates);
   
-  // Ensure the policy premium is kept when updating
+  // FIX: Ensure the policy premium is properly saved
   if (updates.policyPremium !== undefined) {
     dbUpdates.policypremium = updates.policyPremium;
   }
@@ -313,10 +313,38 @@ export async function deleteClient(name) {
 
 // PDF upload helper
 export async function uploadPdf(file, path) {
-  const { data, error } = await supabase.storage.from('pdfs').upload(path, file, {
-    cacheControl: '3600',
-    upsert: false
-  });
-  if (error) throw new Error(error.message);
+  // Create path components first - fix for storage permissions
+  const pathParts = path.split('/');
+  if (pathParts.length > 1) {
+    try {
+      // Check if folder exists first to avoid errors
+      const { data: existingFolder } = await supabase.storage
+        .from('pdfs')
+        .list(pathParts[0]);
+      
+      if (!existingFolder || existingFolder.length === 0) {
+        // Create an empty file to initialize the folder
+        await supabase.storage
+          .from('pdfs')
+          .upload(`${pathParts[0]}/.folder`, new Blob(['']));
+      }
+    } catch (error) {
+      console.error("Error checking/creating folder:", error);
+      // Continue anyway as the main upload might work
+    }
+  }
+
+  const { data, error } = await supabase.storage
+    .from('pdfs')
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: true // Changed to true to overwrite existing files with same name
+    });
+
+  if (error) {
+    console.error("PDF upload error:", error);
+    throw new Error(error.message);
+  }
+  
   return supabase.storage.from('pdfs').getPublicUrl(path).data.publicUrl;
 }

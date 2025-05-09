@@ -455,13 +455,13 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         </Table>
       </div>
 
-      {/* Save Changes Button (Fixed Position) - Updated to be fully opaque and stand out */}
+      {/* Save Changes Button (Fixed Position) - Updated to be fully opaque */}
       {hasUnsavedChanges && (
         <div className="fixed bottom-6 right-6 z-50">
           <Button
             onClick={saveAllChanges}
             disabled={actionLoading}
-            className="bg-white text-black hover:bg-gray-200 border border-white/30 shadow-lg px-5 py-2 rounded-md transition-all duration-200"
+            className="bg-white text-black hover:bg-gray-200 shadow-lg px-5 py-2 rounded-md transition-all duration-200"
           >
             <Save className="h-4 w-4 mr-2" /> Save Changes
           </Button>

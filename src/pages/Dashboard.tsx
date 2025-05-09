@@ -79,8 +79,22 @@ const Dashboard = () => {
           const filteredData = data.filter((client: any) => 
             !deletedClientNames.has(client.name)
           );
-          setClientsCache(prev => ({ ...prev, [cacheKey]: filteredData }));
-          setClients(filteredData);
+          
+          // Map the data to ensure proper format for frontend
+          const formattedData = filteredData.map((client: any) => ({
+            ...client,
+            policiesCount: client.policiescount || 0,
+            policyPremium: client.policypremium || '',
+            policyNumbers: client.policynumbers || [],
+            scheduleDocsUrl: client.scheduledocsurl || [],
+            pdfDocsUrl: client.pdfdocsurl || [],
+            deductionDate: client.deductiondate || '',
+            issueDate: client.issuedate || '',
+            loaDocUrl: client.loadocurl || ''
+          }));
+          
+          setClientsCache(prev => ({ ...prev, [cacheKey]: formattedData }));
+          setClients(formattedData);
           restoreScrollPosition();
         })
         .catch(err => setError(err.message));
@@ -93,8 +107,22 @@ const Dashboard = () => {
           const filteredData = data.filter((client: any) => 
             !deletedClientNames.has(client.name)
           );
-          setClientsCache(prev => ({ ...prev, [cacheKey]: filteredData }));
-          setClients(filteredData);
+          
+          // Map the data to ensure proper format for frontend
+          const formattedData = filteredData.map((client: any) => ({
+            ...client,
+            policiesCount: client.policiescount || 0,
+            policyPremium: client.policypremium || '',
+            policyNumbers: client.policynumbers || [],
+            scheduleDocsUrl: client.scheduledocsurl || [],
+            pdfDocsUrl: client.pdfdocsurl || [],
+            deductionDate: client.deductiondate || '',
+            issueDate: client.issuedate || '',
+            loaDocUrl: client.loadocurl || ''
+          }));
+          
+          setClientsCache(prev => ({ ...prev, [cacheKey]: formattedData }));
+          setClients(formattedData);
           setInitialLoading(false);
           setLoading(false);
           restoreScrollPosition();
@@ -172,8 +200,22 @@ const Dashboard = () => {
         const filteredData = data.filter((client: any) => 
           !deletedClientNames.has(client.name)
         );
-        setClients(filteredData);
-        setClientsCache(prev => ({ ...prev, [`${selectedMonth}-${currentYear}`]: filteredData }));
+        
+        // Map the data to ensure proper format for frontend
+        const formattedData = filteredData.map((client: any) => ({
+          ...client,
+          policiesCount: client.policiescount || 0,
+          policyPremium: client.policypremium || '',
+          policyNumbers: client.policynumbers || [],
+          scheduleDocsUrl: client.scheduledocsurl || [],
+          pdfDocsUrl: client.pdfdocsurl || [],
+          deductionDate: client.deductiondate || '',
+          issueDate: client.issuedate || '',
+          loaDocUrl: client.loadocurl || ''
+        }));
+        
+        setClients(formattedData);
+        setClientsCache(prev => ({ ...prev, [`${selectedMonth}-${currentYear}`]: formattedData }));
       }
     } catch (err: any) {
       setError(err.message);
