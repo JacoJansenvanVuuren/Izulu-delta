@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { X } from 'lucide-react';
@@ -8,7 +8,7 @@ interface MultiEntryFieldProps {
   values: string[];
   onChange: (values: string[]) => void;
   placeholder?: string;
-  onBlur?: () => void;  // Added to control when changes are applied
+  onBlur?: () => void;
 }
 
 const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEntryFieldProps) => {
@@ -17,28 +17,36 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
   const [localValues, setLocalValues] = useState<string[]>(values);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isInitialMount = useRef(true);
 
-  // Sync with parent when values change externally
+  // Carefully sync with parent when values change externally
   useEffect(() => {
-    setLocalValues(values);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    } else {
+      setLocalValues(values);
+    }
   }, [values]);
+
+  // Memoized click outside handler to prevent unnecessary re-renders
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      setIsExpanded(false);
+      
+      // Only trigger onBlur if values have actually changed
+      if (onBlur && JSON.stringify(localValues) !== JSON.stringify(values)) {
+        onBlur();
+      }
+    }
+  }, [onBlur, localValues, values]);
 
   // Handle clicking outside to collapse
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsExpanded(false);
-        if (onBlur) {
-          onBlur();
-        }
-      }
-    };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onBlur]);
+  }, [handleClickOutside]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && currentInput.trim()) {

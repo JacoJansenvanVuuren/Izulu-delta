@@ -24,38 +24,51 @@ export async function fetchMonthlyClients(monthIndex, year) {
 
 // Helper to map camelCase client fields to all-lowercase, no-underscore
 function mapClientForDb(client) {
-  const dbClient = {
-    ...client,
-    deductiondate: client.deductionDate || client.deductiondate,
-    policiescount: client.policiesCount || client.policiescount,
-    scheduledocsurl: client.scheduleDocsUrl || client.scheduledocsurl,
-    pdfdocsurl: client.pdfDocsUrl || client.pdfdocsurl,
-    policynumbers: client.policyNumbers || client.policynumbers,
-    issuedate: client.issueDate || client.issuedate,
-    loadocurl: client.loaDocUrl || client.loadocurl,
-    policypremium: client.policyPremium || client.policypremium,
-    // Add more mappings as needed
-    name: client.name,
-    location: client.location,
-    products: client.products,
-    year: client.year,
-    client_id: client.client_id,
-    created_at: client.created_at,
-    // id will be conditionally added below
+  const dbClient = { ...client };
+  
+  // Explicitly map only known, existing columns
+  const existingColumns = [
+    'deductiondate', 'policiescount', 'scheduledocsurl', 
+    'pdfdocsurl', 'policynumbers', 'issuedate', 
+    'loadocurl', 'policypremium', 'name', 'location', 
+    'products', 'year', 'client_id', 'created_at'
+  ];
+
+  // Filter out any keys not in existing columns
+  Object.keys(dbClient).forEach(key => {
+    // Convert camelCase to snake_case for comparison
+    const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    
+    if (!existingColumns.includes(key) && !existingColumns.includes(snakeKey)) {
+      delete dbClient[key];
+    }
+  });
+
+  // Ensure critical fields are present and use snake_case
+  const criticalFieldMap = {
+    'deductionDate': 'deductiondate',
+    'policiesCount': 'policiescount',
+    'scheduleDocsUrl': 'scheduledocsurl',
+    'pdfDocsUrl': 'pdfdocsurl',
+    'policyNumbers': 'policynumbers',
+    'issueDate': 'issuedate',
+    'loaDocUrl': 'loadocurl',
+    'policyPremium': 'policypremium'
   };
-  // Remove all camelCase properties that could cause schema errors
-  delete dbClient.deductionDate;
-  delete dbClient.policiesCount;
-  delete dbClient.scheduleDocsUrl;
-  delete dbClient.pdfDocsUrl;
-  delete dbClient.policyNumbers;
-  delete dbClient.issueDate;
-  delete dbClient.loaDocUrl;
-  delete dbClient.policyPremium;
-  // Remove id unless it is defined and not null (prevents NOT NULL constraint errors)
-  if (dbClient.id === undefined || dbClient.id === null) {
+
+  // Apply field mappings
+  Object.entries(criticalFieldMap).forEach(([camelCase, snakeCase]) => {
+    if (client[camelCase] !== undefined) {
+      dbClient[snakeCase] = client[camelCase];
+    }
+  });
+
+  // Conditionally handle ID
+  if (dbClient.id === undefined || dbClient.id === null || 
+      (typeof dbClient.id === 'string' && dbClient.id.startsWith('temp_'))) {
     delete dbClient.id;
   }
+
   return dbClient;
 }
 
@@ -83,21 +96,91 @@ export async function addMonthlyClient(monthIndex, year, client) {
 // Update a row in a monthly table
 export async function updateMonthlyClient(monthIndex, year, id, updates) {
   const table = getMonthlyTableName(monthIndex);
-  const dbUpdates = mapClientForDb(updates);
   
-  // FIX: Ensure the policy premium is properly saved
-  if (updates.policyPremium !== undefined) {
-    dbUpdates.policypremium = updates.policyPremium;
+  console.log('Update Request:', {
+    table,
+    id,
+    year,
+    updates: JSON.stringify(updates)
+  });
+
+  // First, fetch the existing record to preserve critical fields
+  const { data: existingRecord, error: fetchError } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', id)
+    .eq('year', year)
+    .single();
+  
+  if (fetchError) {
+    console.error('Error fetching existing record:', fetchError);
+    throw new Error(fetchError.message);
   }
+
+  console.log('Existing Record:', JSON.stringify(existingRecord));
+
+  // Prepare updates, preserving existing values for critical fields
+  const safeUpdates = { ...existingRecord };
+
+  // Mapping of fields with potential camelCase/snake_case variations
+  const fieldMappings = {
+    'policiescount': ['policiesCount', 'policiescount'],
+    'policypremium': ['policyPremium', 'policypremium'],
+    'policynumbers': ['policyNumbers', 'policynumbers'],
+    'scheduledocsurl': ['scheduleDocsUrl', 'scheduledocsurl'],
+    'pdfdocsurl': ['pdfDocsUrl', 'pdfdocsurl'],
+    'deductiondate': ['deductionDate', 'deductiondate'],
+    'issuedate': ['issueDate', 'issuedate'],
+    'loadocurl': ['loaDocUrl', 'loadocurl']
+  };
+
+  // Allowed fields to update
+  const updateableFields = [
+    'name', 'location', 'products', 'deductiondate', 
+    'scheduledocsurl', 'pdfdocsurl', 'policynumbers', 
+    'issuedate', 'loadocurl', 'policypremium', 'client_id'
+  ];
+
+  // Update only specific fields, preserving others
+  updateableFields.forEach(field => {
+    if (updates[field] !== undefined) {
+      safeUpdates[field] = updates[field];
+    }
+  });
+
+  // Special handling for fields with potential case variations
+  Object.entries(fieldMappings).forEach(([snakeCaseField, variations]) => {
+    const [camelCaseField, altSnakeCaseField] = variations;
+    
+    // Prioritize camelCase, then snake_case, then existing record
+    const fieldValue = updates[camelCaseField] !== undefined 
+      ? updates[camelCaseField] 
+      : (updates[altSnakeCaseField] !== undefined 
+        ? updates[altSnakeCaseField] 
+        : (existingRecord[snakeCaseField] || (snakeCaseField.includes('count') ? 0 : '')));
+
+    safeUpdates[snakeCaseField] = fieldValue;
+  });
+
+  // Ensure year is set correctly
+  safeUpdates.year = year;
   
+  console.log('Safe Updates:', JSON.stringify(safeUpdates));
+
   const { data, error } = await supabase
     .from(table)
-    .update(dbUpdates)
+    .update(safeUpdates)
     .eq('id', id)
     .eq('year', year)
     .select();
-  if (error) throw new Error(error.message);
   
+  if (error) {
+    console.error('Error updating record:', error);
+    throw new Error(error.message);
+  }
+  
+  console.log('Update Result:', JSON.stringify(data));
+
   // Also update in the global clients table
   await updateGlobalClientFromMonthly({...updates, name: updates.name});
   
