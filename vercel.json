@@ -1,8 +1,7 @@
 {
   "routes": [
-    { "src": "/(.*)", "dest": "/index.html", "status": 200 },
-    { "handle": "filesystem" },
-    { "src": "/assets/(.*)", "headers": { "Cache-Control": "public, max-age=31536000, immutable" } }
+    { "src": "^/assets/(.*)$", "headers": { "Cache-Control": "public, max-age=31536000, immutable" } },
+    { "src": "/(.*)", "dest": "/index.html", "continue": true }
   ],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
@@ -11,6 +10,12 @@
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Content-Type", "value": "text/html; charset=utf-8" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
         { "key": "Content-Type", "value": "application/javascript" }
       ]
     }
