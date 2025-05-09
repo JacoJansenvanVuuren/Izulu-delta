@@ -10,12 +10,13 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     fs: {
-      allow: ['.', path.resolve(__dirname, 'src')],
+      allow: ['.', path.resolve(__dirname, 'src'), path.resolve(__dirname, 'index.html')],
     },
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Content-Type': 'application/javascript',
     },
   },
   plugins: [
@@ -45,7 +46,8 @@ export default defineConfig(({ mode }) => ({
         },
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        format: 'esm'
       }
     },
     sourcemap: true,
@@ -54,11 +56,16 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ['react', 'react-dom'],
     esbuildOptions: {
-      target: 'esnext'
+      target: 'esnext',
+      loader: {
+        '.js': 'jsx',
+        '.ts': 'tsx'
+      }
     }
   },
   esbuild: {
-    target: 'esnext'
+    target: 'esnext',
+    loader: 'tsx'
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode)
@@ -68,6 +75,7 @@ export default defineConfig(({ mode }) => ({
     strictPort: true,
     headers: {
       'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'application/javascript',
     }
   }
 }));
