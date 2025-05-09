@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import ClientTable from '@/components/ClientTable';
 import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
 import MonthSelector from '@/components/MonthSelector';
@@ -12,7 +13,6 @@ import {
   fetchAllClients,
   deleteClient
 } from '../utils/supabaseDashboard';
-import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from 'lucide-react';
 
 // Define Client interface (matching the one in ClientTable.tsx)
@@ -41,6 +41,8 @@ const Dashboard = () => {
   const [showSummary, setShowSummary] = useState(false);
   // Cache for monthly clients: { ["month-year"]: Client[] }
   const [clientsCache, setClientsCache] = useState<Record<string, Client[]>>({});
+  // Local deletion tracking
+  const [deletedClientNames, setDeletedClientNames] = useState<Set<string>>(new Set());
 
   // Fetch clients for the selected month/year with cache
   useEffect(() => {
@@ -51,8 +53,12 @@ const Dashboard = () => {
       // Fetch in background to update cache
       fetchMonthlyClients(selectedMonth, currentYear)
         .then(data => {
-          setClientsCache(prev => ({ ...prev, [cacheKey]: data }));
-          setClients(data);
+          // Filter out any clients that were deleted in the global view
+          const filteredData = data.filter((client: any) => 
+            !deletedClientNames.has(client.name)
+          );
+          setClientsCache(prev => ({ ...prev, [cacheKey]: filteredData }));
+          setClients(filteredData);
         })
         .catch(err => setError(err.message));
     } else {
@@ -60,13 +66,17 @@ const Dashboard = () => {
       setError(null);
       fetchMonthlyClients(selectedMonth, currentYear)
         .then(data => {
-          setClientsCache(prev => ({ ...prev, [cacheKey]: data }));
-          setClients(data);
+          // Filter out any clients that were deleted in the global view
+          const filteredData = data.filter((client: any) => 
+            !deletedClientNames.has(client.name)
+          );
+          setClientsCache(prev => ({ ...prev, [cacheKey]: filteredData }));
+          setClients(filteredData);
         })
         .catch(err => setError(err.message))
         .finally(() => setLoading(false));
     }
-  }, [selectedMonth, currentYear]);
+  }, [selectedMonth, currentYear, deletedClientNames]);
 
   // Fetch global clients for the summary view
   useEffect(() => {
@@ -75,7 +85,11 @@ const Dashboard = () => {
       fetchAllClients()
         .then(data => {
           console.log("Global clients fetched:", data);
-          setGlobalClients(data);
+          // Filter out any clients that were deleted
+          const filteredData = data.filter((client: any) => 
+            !deletedClientNames.has(client.name)
+          );
+          setGlobalClients(filteredData);
         })
         .catch(err => {
           console.error("Error fetching global clients:", err);
@@ -83,7 +97,7 @@ const Dashboard = () => {
         })
         .finally(() => setLoading(false));
     }
-  }, [showSummary]);
+  }, [showSummary, deletedClientNames]);
 
   // Summary logic (aggregate by name/location)
   const summaryMap = new Map();
@@ -116,19 +130,22 @@ const Dashboard = () => {
       if (showSummary) {
         console.log("Reloading global clients");
         const data = await fetchAllClients();
-        setGlobalClients(data);
+        // Filter out any clients that were deleted
+        const filteredData = data.filter((client: any) => 
+          !deletedClientNames.has(client.name)
+        );
+        setGlobalClients(filteredData);
       } else {
         const data = await fetchMonthlyClients(selectedMonth, currentYear);
-        setClients(data);
-        setClientsCache(prev => ({ ...prev, [`${selectedMonth}-${currentYear}`]: data }));
+        // Filter out any clients that were deleted
+        const filteredData = data.filter((client: any) => 
+          !deletedClientNames.has(client.name)
+        );
+        setClients(filteredData);
+        setClientsCache(prev => ({ ...prev, [`${selectedMonth}-${currentYear}`]: filteredData }));
       }
     } catch (err: any) {
       setError(err.message);
-      toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive"
-      });
     } finally {
       setLoading(false);
     }
@@ -139,53 +156,42 @@ const Dashboard = () => {
     try {
       setLoading(true);
       await deleteClient(clientName);
-      toast({
-        title: "Client Deleted",
-        description: `${clientName} has been removed from all records`,
+      
+      // Update local state immediately
+      if (globalClients) {
+        const updatedGlobalClients = globalClients.filter(client => client.name !== clientName);
+        setGlobalClients(updatedGlobalClients);
+      }
+      
+      // Track deleted client names to filter them from all views
+      setDeletedClientNames(prev => new Set([...prev, clientName]));
+      
+      // Also update the cache for all months to remove this client
+      const updatedCache: Record<string, Client[]> = {};
+      Object.entries(clientsCache).forEach(([key, clientList]) => {
+        updatedCache[key] = clientList.filter(client => client.name !== clientName);
       });
-      reloadClients();
+      setClientsCache(updatedCache);
+      
+      // If we're in monthly view, update the current clients list too
+      if (clients) {
+        const updatedClients = clients.filter(client => client.name !== clientName);
+        setClients(updatedClients);
+      }
     } catch (err: any) {
       setError(err.message);
-      toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive"
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  // UI for loading and error
-  if (loading) return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      background: 'rgba(15, 23, 42, 0.4)',
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      pointerEvents: 'none',
-      transition: 'background 0.3s',
-    }}>
-      <div style={{
-        width: 64,
-        height: 64,
-        border: '8px solid #fff',
-        borderTop: '8px solid #6366f1',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-        boxShadow: '0 2px 24px #6366f1cc',
-        background: 'rgba(255,255,255,0.03)'
-      }} />
-      <style>{`@keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }`}</style>
+  // Inline loading indicator for monthly view changes
+  const inlineLoading = loading && (
+    <div className="flex justify-center items-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+      <span className="ml-2 text-primary/70">Loading...</span>
     </div>
   );
-  if (error) return <div style={{padding: 40, color: 'red', textAlign: 'center'}}>Error: {error}</div>;
 
   return (
     <>
@@ -209,12 +215,7 @@ const Dashboard = () => {
           </div>
           
           {/* Inline loading indicator */}
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
-              <span className="ml-2 text-primary/70">Loading...</span>
-            </div>
-          ) : error ? (
+          {inlineLoading ? inlineLoading : error ? (
             <div className="p-6 text-center text-red-500">Error: {error}</div>
           ) : (
             <>
@@ -255,18 +256,8 @@ const Dashboard = () => {
                       await addMonthlyClient(selectedMonth, currentYear, client);
                       reloadClients();
                       if (cb) cb();
-                      
-                      toast({
-                        title: "Client Added",
-                        description: "New client has been added successfully",
-                      });
                     } catch (err: any) {
                       setError(err.message);
-                      toast({
-                        title: "Error",
-                        description: err.message,
-                        variant: "destructive"
-                      });
                       if (cb) cb(err.message);
                     }
                   }}
@@ -275,18 +266,8 @@ const Dashboard = () => {
                       await updateMonthlyClient(selectedMonth, currentYear, client.id, client);
                       reloadClients();
                       if (cb) cb();
-                      
-                      toast({
-                        title: "Client Updated",
-                        description: "Client information has been updated",
-                      });
                     } catch (err: any) {
                       setError(err.message);
-                      toast({
-                        title: "Error",
-                        description: err.message,
-                        variant: "destructive"
-                      });
                       if (cb) cb(err.message);
                     }
                   }}
@@ -295,18 +276,8 @@ const Dashboard = () => {
                       await deleteMonthlyClient(selectedMonth, currentYear, id);
                       reloadClients();
                       if (cb) cb();
-                      
-                      toast({
-                        title: "Client Deleted",
-                        description: "Client has been removed successfully",
-                      });
                     } catch (err: any) {
                       setError(err.message);
-                      toast({
-                        title: "Error",
-                        description: err.message,
-                        variant: "destructive"
-                      });
                       if (cb) cb(err.message);
                     }
                   }}

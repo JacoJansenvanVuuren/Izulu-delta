@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabase';
 
 // Helper to get table name for a month and year (e.g. 'clients_january')
@@ -22,7 +21,6 @@ export async function fetchMonthlyClients(monthIndex: number, year: number) {
   return data;
 }
 
-// Add a row to a monthly table
 // Helper to map camelCase client fields to all-lowercase, no-underscore
 function mapClientForDb(client: any) {
   const dbClient = {
@@ -85,6 +83,12 @@ export async function addMonthlyClient(monthIndex: number, year: number, client:
 export async function updateMonthlyClient(monthIndex: number, year: number, id: string, updates: any) {
   const table = getMonthlyTableName(monthIndex);
   const dbUpdates = mapClientForDb(updates);
+  
+  // Ensure the policy premium is kept when updating
+  if (updates.policyPremium !== undefined) {
+    dbUpdates.policypremium = updates.policyPremium;
+  }
+  
   const { data, error } = await supabase
     .from(table)
     .update(dbUpdates)
@@ -274,26 +278,35 @@ export async function fetchAllClients() {
   return data;
 }
 
+// Delete client from all tables (both global and all monthly tables)
 export async function deleteClient(name: string) {
+  if (!name) throw new Error("Client name is required");
+  
   // First delete all monthly records for this client
   const months = [
     'january', 'february', 'march', 'april', 'may', 'june',
     'july', 'august', 'september', 'october', 'november', 'december'
   ];
   
-  for (const month of months) {
-    await supabase
+  // Delete from all monthly tables in parallel for efficiency
+  const deletePromises = months.map(month => 
+    supabase
       .from(`clients_${month}`)
       .delete()
-      .eq('name', name);
-  }
+      .eq('name', name)
+  );
+  
+  // Execute all delete operations
+  await Promise.all(deletePromises);
   
   // Then delete from global table
   const { error } = await supabase
     .from('clients')
     .delete()
     .eq('name', name);
+  
   if (error) throw new Error(error.message);
+  
   return true;
 }
 

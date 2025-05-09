@@ -9,7 +9,6 @@ import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
 import { Plus, Trash2, Search, FileText, AlertCircle, Calendar, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { toast } from "@/components/ui/use-toast";
 
 interface Client {
   id: string;
@@ -284,18 +283,8 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       // Clear all unsaved changes
       setUnsavedChanges({});
       setHasUnsavedChanges(false);
-      
-      toast({
-        title: "Changes Saved",
-        description: "All changes have been saved successfully",
-      });
     } catch (error: any) {
       setActionError(error instanceof Error ? error.message : 'An error occurred while saving changes');
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'An error occurred while saving changes',
-        variant: "destructive"
-      });
     } finally {
       setActionLoading(false);
     }
@@ -466,14 +455,13 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         </Table>
       </div>
 
-      {/* Save Changes Button (Fixed Position) */}
+      {/* Save Changes Button (Fixed Position) - Updated styling */}
       {hasUnsavedChanges && (
         <div className="fixed bottom-6 right-6 z-50">
           <Button
             onClick={saveAllChanges}
             disabled={actionLoading}
-            variant="outline"
-            className="text-white border-white/20 hover:bg-white/10 shadow-lg"
+            className="bg-white/10 hover:bg-white/30 text-white border border-white/30 shadow-lg px-5 py-2 rounded-md transition-all duration-200"
           >
             <Save className="h-4 w-4 mr-2" /> Save Changes
           </Button>

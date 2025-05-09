@@ -21,7 +21,6 @@ export async function fetchMonthlyClients(monthIndex, year) {
   return data;
 }
 
-// Add a row to a monthly table
 // Helper to map camelCase client fields to all-lowercase, no-underscore
 function mapClientForDb(client) {
   const dbClient = {
@@ -84,6 +83,12 @@ export async function addMonthlyClient(monthIndex, year, client) {
 export async function updateMonthlyClient(monthIndex, year, id, updates) {
   const table = getMonthlyTableName(monthIndex);
   const dbUpdates = mapClientForDb(updates);
+  
+  // Ensure the policy premium is kept when updating
+  if (updates.policyPremium !== undefined) {
+    dbUpdates.policypremium = updates.policyPremium;
+  }
+  
   const { data, error } = await supabase
     .from(table)
     .update(dbUpdates)
@@ -273,46 +278,35 @@ export async function fetchAllClients() {
   return data;
 }
 
-export async function addClient(client) {
-  const dbClient = mapClientForDb(client);
-  const { data, error } = await supabase
-    .from('clients')
-    .insert([dbClient])
-    .select();
-  if (error) throw new Error(error.message);
-  return data?.[0];
-}
-
-export async function updateClient(id, updates) {
-  const { data, error } = await supabase
-    .from('clients')
-    .update(updates)
-    .eq('id', id)
-    .select();
-  if (error) throw new Error(error.message);
-  return data?.[0];
-}
-
+// Delete client from all tables (both global and all monthly tables)
 export async function deleteClient(name) {
+  if (!name) throw new Error("Client name is required");
+  
   // First delete all monthly records for this client
   const months = [
     'january', 'february', 'march', 'april', 'may', 'june',
     'july', 'august', 'september', 'october', 'november', 'december'
   ];
   
-  for (const month of months) {
-    await supabase
+  // Delete from all monthly tables in parallel for efficiency
+  const deletePromises = months.map(month => 
+    supabase
       .from(`clients_${month}`)
       .delete()
-      .eq('name', name);
-  }
+      .eq('name', name)
+  );
+  
+  // Execute all delete operations
+  await Promise.all(deletePromises);
   
   // Then delete from global table
   const { error } = await supabase
     .from('clients')
     .delete()
     .eq('name', name);
+  
   if (error) throw new Error(error.message);
+  
   return true;
 }
 
