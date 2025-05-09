@@ -1,22 +1,31 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
-// https://vitejs.dev/config/
+// @ts-ignore
+import componentTagger from 'vite-plugin-component-tagger';
+
+console.log('Current working directory:', process.cwd());
+console.log('__dirname:', __dirname);
+
 export default defineConfig(({ mode }) => ({
   base: '/',
+  publicDir: path.resolve(__dirname, 'public'),
   server: {
     host: "::",
     port: 8080,
     fs: {
-      allow: ['.', path.resolve(__dirname, 'src'), path.resolve(__dirname, 'index.html')],
+      allow: [
+        path.resolve(__dirname, '.'),
+        path.resolve(__dirname, 'src'),
+        path.resolve(__dirname, 'index.html'),
+        path.resolve(__dirname, 'public'),
+      ],
     },
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Content-Type': 'application/javascript',
     },
   },
   plugins: [
@@ -44,9 +53,9 @@ export default defineConfig(({ mode }) => ({
             return 'vendor';
           }
         },
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
+        entryFileNames: '[name]-[hash].js',
+        chunkFileNames: '[name]-[hash].js',
+        assetFileNames: '[name]-[hash].[ext]',
         format: 'esm'
       }
     },
@@ -68,14 +77,14 @@ export default defineConfig(({ mode }) => ({
     loader: 'tsx'
   },
   define: {
-    'process.env.NODE_ENV': JSON.stringify(mode)
+    'process.env.NODE_ENV': JSON.stringify(mode),
+    '__VITE_IS_MODERN__': 'true'
   },
   preview: {
     port: 8080,
     strictPort: true,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Content-Type': 'application/javascript',
     }
   }
 }));
