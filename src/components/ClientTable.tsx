@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { uploadPdf } from '../utils/supabaseDashboard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -61,6 +62,8 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
   const [clients, setClients] = useState<Client[]>(formattedInitialClients);
   const [unsavedChanges, setUnsavedChanges] = useState<{[key: string]: Partial<Client>}>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Track which row is currently being edited
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
   // Sync local state with initialClients if it changes (e.g., after global delete)
   useEffect(() => {
@@ -85,6 +88,76 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       client.policyPremium.toLowerCase().includes(searchLower)
     );
   });
+
+  // Auto-save when row changes
+  const autoSaveRow = async (clientId: string) => {
+    // Don't do anything if there are no changes for this client
+    if (!unsavedChanges[clientId]) return;
+    
+    const client = clients.find(c => c.id === clientId);
+    if (!client || !onUpdateClient) return;
+
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      
+      await new Promise<void>((resolve, reject) => {
+        onUpdateClient(
+          { ...client, ...unsavedChanges[clientId] },
+          (err) => {
+            if (err) reject(new Error(err));
+            else resolve();
+          }
+        );
+      });
+      
+      // Clear saved changes for this client
+      setUnsavedChanges(prev => {
+        const newChanges = { ...prev };
+        delete newChanges[clientId];
+        return newChanges;
+      });
+      
+      // Update hasUnsavedChanges if no more changes
+      if (Object.keys(unsavedChanges).length <= 1) {
+        setHasUnsavedChanges(false);
+      }
+    } catch (error: any) {
+      setActionError(error instanceof Error ? error.message : 'An error occurred while saving changes');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle row click to set active row
+  const handleRowClick = (clientId: string) => {
+    if (activeRowId && activeRowId !== clientId) {
+      // Auto-save previous row
+      autoSaveRow(activeRowId);
+    }
+    setActiveRowId(clientId);
+  };
+
+  // Handle clicking outside any row
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      // Check if click is outside any row
+      const target = e.target as Element;
+      const isOutsideRow = !target.closest('tr');
+      const isOutsideTable = !target.closest('table');
+      const isSaveButton = target.closest('button')?.textContent?.includes('Save Changes');
+      
+      if ((isOutsideRow || isOutsideTable) && !isSaveButton && activeRowId) {
+        autoSaveRow(activeRowId);
+        setActiveRowId(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeRowId, unsavedChanges]);
 
   // Robust Supabase PDF/file upload logic
   const handleFileUpload = async (clientId: string, field: 'loaDocUrl', file: File) => {
@@ -290,6 +363,14 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
+  // Custom date input handler that toggles the date picker
+  const handleDateIconClick = (inputId: string) => {
+    const dateInput = document.getElementById(inputId) as HTMLInputElement;
+    if (dateInput) {
+      dateInput.showPicker();
+    }
+  };
+
   return (
     <div className="space-y-4 relative">
       {/* Error message for actions */}
@@ -341,7 +422,11 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
           </TableHeader>
           <TableBody>
             {filteredClients.map((client) => (
-              <TableRow key={client.id} className="border-t border-white/5 hover:bg-white/5">
+              <TableRow 
+                key={client.id} 
+                className="border-t border-white/5 hover:bg-white/5"
+                onClick={() => handleRowClick(client.id)}
+              >
                 <TableCell>
                   <Input 
                     value={client.name} 
@@ -397,23 +482,33 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                 <TableCell>
                   <div className="relative flex items-center">
                     <Input 
+                      id={`issue-date-${client.id}`}
                       type="date"
                       value={client.issueDate}
                       onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)}
                       className="bg-transparent border-white/10 pr-10"
+                      style={{ colorScheme: 'dark' }}
                     />
-                    <Calendar className="absolute right-3 h-4 w-4 text-white pointer-events-none" />
+                    <Calendar 
+                      className="absolute right-3 h-4 w-4 text-white cursor-pointer" 
+                      onClick={() => handleDateIconClick(`issue-date-${client.id}`)}
+                    />
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="relative flex items-center">
                     <Input 
+                      id={`deduction-date-${client.id}`}
                       type="date"
                       value={client.deductionDate}
                       onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)}
                       className="bg-transparent border-white/10 pr-10"
+                      style={{ colorScheme: 'dark' }}
                     />
-                    <Calendar className="absolute right-3 h-4 w-4 text-white pointer-events-none" />
+                    <Calendar 
+                      className="absolute right-3 h-4 w-4 text-white cursor-pointer" 
+                      onClick={() => handleDateIconClick(`deduction-date-${client.id}`)}
+                    />
                   </div>
                 </TableCell>
                 <TableCell>
@@ -444,7 +539,10 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                           <Button 
                             variant="destructive" 
                             size="sm" 
-                            onClick={() => initiateClientDeletion(client)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              initiateClientDeletion(client);
+                            }}
                             disabled={actionLoading}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -461,8 +559,8 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         </Table>
       </div>
 
-      {/* Save Changes Button (Fixed Position) - Updated to be fully opaque */}
-      {hasUnsavedChanges && (
+      {/* Save Changes Button (Fixed Position) - Only shown when needed */}
+      {hasUnsavedChanges && Object.keys(unsavedChanges).length > 0 && (
         <div className="fixed bottom-6 right-6 z-50">
           <Button
             onClick={saveAllChanges}
