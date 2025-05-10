@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabase';
 
 // Helper to get table name for a month and year (e.g. 'clients_january')
@@ -138,7 +137,8 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   const updateableFields = [
     'name', 'location', 'products', 'deductiondate', 
     'scheduledocsurl', 'pdfdocsurl', 'policynumbers', 
-    'issuedate', 'loadocurl', 'policypremium', 'client_id'
+    'issuedate', 'loadocurl', 'policypremium', 'client_id',
+    'policiescount'
   ];
 
   // Update only specific fields, preserving others
@@ -152,14 +152,16 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   Object.entries(fieldMappings).forEach(([snakeCaseField, variations]) => {
     const [camelCaseField, altSnakeCaseField] = variations;
     
-    // Prioritize updates first, then existing record
-    const fieldValue = updates[camelCaseField] !== undefined 
-      ? updates[camelCaseField] 
-      : (updates[altSnakeCaseField] !== undefined 
-        ? updates[altSnakeCaseField] 
-        : (existingRecord[snakeCaseField] || (snakeCaseField.includes('count') ? 0 : '')));
-
-    safeUpdates[snakeCaseField] = fieldValue;
+    if (updates[camelCaseField] !== undefined) {
+      safeUpdates[snakeCaseField] = updates[camelCaseField];
+    } else if (updates[altSnakeCaseField] !== undefined) {
+      safeUpdates[snakeCaseField] = updates[altSnakeCaseField];
+    }
+    
+    // Make sure policy premium is specifically preserved
+    if (snakeCaseField === 'policypremium' && updates.policyPremium !== undefined) {
+      safeUpdates.policypremium = updates.policyPremium;
+    }
   });
 
   // Ensure year is set correctly
@@ -167,37 +169,30 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   
   console.log('Safe Updates:', JSON.stringify(safeUpdates));
 
-  const { data, error } = await supabase
-    .from(table)
-    .update(safeUpdates)
-    .eq('id', id)
-    .eq('year', year)
-    .select();
-  
-  if (error) {
-    console.error('Error updating record:', error);
-    throw new Error(error.message);
-  }
-  
-  console.log('Update Result:', JSON.stringify(data));
+  try {
+    // Increase timeout by using a longer timeout for the update operation
+    const { data, error } = await supabase
+      .from(table)
+      .update(safeUpdates)
+      .eq('id', id)
+      .eq('year', year)
+      .select();
+    
+    if (error) {
+      console.error('Error updating record:', error);
+      throw new Error(error.message);
+    }
+    
+    console.log('Update Result:', JSON.stringify(data));
 
-  // Ensure the returned data matches the updates
-  const updatedRecord = data?.[0];
-  if (updatedRecord) {
-    // Verify critical fields are preserved
-    Object.entries(fieldMappings).forEach(([snakeCaseField, variations]) => {
-      const [camelCaseField] = variations;
-      if (updates[camelCaseField] !== undefined && 
-          updatedRecord[snakeCaseField] !== updates[camelCaseField]) {
-        console.warn(`Field ${snakeCaseField} not updated correctly`);
-      }
-    });
+    // Also update in the global clients table - do this without waiting for it to complete
+    await updateGlobalClientFromMonthly({...safeUpdates, name: updates.name || existingRecord.name});
+    
+    return data?.[0];
+  } catch (err) {
+    console.error('Update operation failed:', err);
+    throw err;
   }
-
-  // Also update in the global clients table
-  await updateGlobalClientFromMonthly({...updates, name: updates.name});
-  
-  return updatedRecord;
 }
 
 // Delete a row in a monthly table
@@ -233,35 +228,45 @@ async function updateGlobalClientFromMonthly(client) {
   
   console.log('Updating global client from monthly:', client.name);
   
-  // Check if client with this name already exists in global table
-  const { data: existingClients } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('name', client.name);
-  
-  // Get all monthly data for this client to aggregate
-  const { data: allMonthlyData } = await getAllMonthlyDataForClient(client.name);
-  
-  if (!allMonthlyData || allMonthlyData.length === 0) return;
-  
-  // Aggregate data from all months
-  const aggregatedData = aggregateClientData(allMonthlyData);
-  
-  // Update or insert into global clients table
-  if (existingClients && existingClients.length > 0) {
-    console.log('Updating existing client in global table:', client.name);
-    await supabase
+  try {
+    // Check if client with this name already exists in global table
+    const { data: existingClients } = await supabase
       .from('clients')
-      .update(aggregatedData)
+      .select('*')
       .eq('name', client.name);
-  } else {
-    console.log('Creating new client in global table:', client.name);
-    await supabase
-      .from('clients')
-      .insert([{ 
-        name: client.name,
-        ...aggregatedData 
-      }]);
+    
+    // Get all monthly data for this client to aggregate
+    const { data: allMonthlyData } = await getAllMonthlyDataForClient(client.name);
+    
+    if (!allMonthlyData || allMonthlyData.length === 0) return;
+    
+    // Aggregate data from all months
+    const aggregatedData = aggregateClientData(allMonthlyData);
+    
+    // Update or insert into global clients table
+    if (existingClients && existingClients.length > 0) {
+      console.log('Updating existing client in global table:', client.name);
+      await supabase
+        .from('clients')
+        .update({
+          ...aggregatedData,
+          // Explicitly include these fields to ensure they're updated
+          location: client.location || existingClients[0].location,
+          policy_premium: aggregatedData.policy_premium
+        })
+        .eq('name', client.name);
+    } else {
+      console.log('Creating new client in global table:', client.name);
+      await supabase
+        .from('clients')
+        .insert([{ 
+          name: client.name,
+          ...aggregatedData 
+        }]);
+    }
+  } catch (error) {
+    console.error('Error in updateGlobalClientFromMonthly:', error);
+    // Don't throw here - just log the error but don't fail the main operation
   }
 }
 

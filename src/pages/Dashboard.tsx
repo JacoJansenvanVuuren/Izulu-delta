@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ClientTable from '@/components/ClientTable';
 import ClientsSummaryTable, { ClientSummary } from '@/components/ClientsSummaryTable';
@@ -49,22 +48,22 @@ const Dashboard = () => {
   const [deletedClientNames, setDeletedClientNames] = useState<Set<string>>(new Set());
 
   // Function to save scroll position
-  const saveScrollPosition = () => {
+  const saveScrollPosition = useCallback(() => {
     scrollPositionRef.current = window.scrollY;
-  };
+  }, []);
 
   // Function to restore scroll position
-  const restoreScrollPosition = () => {
+  const restoreScrollPosition = useCallback(() => {
     setTimeout(() => {
       window.scrollTo(0, scrollPositionRef.current);
     }, 0);
-  };
+  }, []);
 
   // Modified setSelectedMonth to save scroll position
-  const handleMonthChange = (newMonth: number) => {
+  const handleMonthChange = useCallback((newMonth: number) => {
     saveScrollPosition();
     setSelectedMonth(newMonth);
-  };
+  }, [saveScrollPosition]);
 
   // Fetch clients for the selected month/year with cache
   useEffect(() => {
@@ -133,7 +132,7 @@ const Dashboard = () => {
           setLoading(false);
         });
     }
-  }, [selectedMonth, currentYear, deletedClientNames]);
+  }, [selectedMonth, currentYear, deletedClientNames, restoreScrollPosition]);
 
   // Fetch global clients for the summary view
   useEffect(() => {
@@ -209,17 +208,7 @@ const Dashboard = () => {
 
         const data = await fetchMonthlyClients(selectedMonth, currentYear);
         // Filter out any clients that were deleted
-        const filteredData = data.map((client: any) => ({
-          ...client,
-          policiesCount: client.policiescount || 0,
-          policyPremium: client.policypremium || '',
-          policyNumbers: client.policynumbers || [],
-          scheduleDocsUrl: client.scheduledocsurl || [],
-          pdfDocsUrl: client.pdfdocsurl || [],
-          deductionDate: client.deductiondate || '',
-          issueDate: client.issuedate || '',
-          loaDocUrl: client.loadocurl || ''
-        })).filter((client: Client) => 
+        const filteredData = data.filter((client: any) => 
           !deletedClientNames.has(client.name)
         );
         
