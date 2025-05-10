@@ -19,7 +19,7 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
 
-  // Carefully sync with parent when values change externally
+  // Sync with parent component whenever values prop changes
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -91,7 +91,7 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
         <div className="flex flex-wrap gap-1 inline-flex">
           {localValues.map((item, index) => (
             <Badge 
-              key={index} 
+              key={`${item}-${index}`} 
               variant="secondary" 
               className="flex items-center gap-1 bg-secondary/30 mx-0.5 my-0.5 inline-flex"
               style={{ 

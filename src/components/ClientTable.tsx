@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { uploadPdf } from '../utils/supabaseDashboard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -101,15 +100,21 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
       setActionLoading(true);
       setActionError(null);
       
+      // Get the complete client with all changes
+      const updatedClient = { ...client, ...unsavedChanges[clientId] };
+      
       await new Promise<void>((resolve, reject) => {
         onUpdateClient(
-          { ...client, ...unsavedChanges[clientId] },
+          updatedClient,
           (err) => {
             if (err) reject(new Error(err));
             else resolve();
           }
         );
       });
+      
+      // Update the clients list immediately to ensure displayed data is correct
+      setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...unsavedChanges[clientId] } : c));
       
       // Clear saved changes for this client
       setUnsavedChanges(prev => {
@@ -245,6 +250,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
+  // Update the MultiEntryField update handler to immediately update the client data
   const updateMultiEntryField = (clientId: string, field: 'products' | 'policyNumbers', values: string[]) => {
     const updatedClients = clients.map(client => 
       client.id === clientId 

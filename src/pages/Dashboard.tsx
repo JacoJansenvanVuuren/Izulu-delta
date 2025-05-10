@@ -84,12 +84,13 @@ const Dashboard = () => {
             ...client,
             policiesCount: client.policiescount || 0,
             policyPremium: client.policypremium || '',
-            policyNumbers: client.policynumbers || [],
-            scheduleDocsUrl: client.scheduledocsurl || [],
-            pdfDocsUrl: client.pdfdocsurl || [],
+            policyNumbers: Array.isArray(client.policynumbers) ? client.policynumbers : [],
+            scheduleDocsUrl: Array.isArray(client.scheduledocsurl) ? client.scheduledocsurl : [],
+            pdfDocsUrl: Array.isArray(client.pdfdocsurl) ? client.pdfdocsurl : [],
             deductionDate: client.deductiondate || '',
             issueDate: client.issuedate || '',
-            loaDocUrl: client.loadocurl || ''
+            loaDocUrl: client.loadocurl || '',
+            products: Array.isArray(client.products) ? client.products : []
           }));
           
           setClientsCache(prev => ({ ...prev, [cacheKey]: formattedData }));
@@ -112,12 +113,13 @@ const Dashboard = () => {
             ...client,
             policiesCount: client.policiescount || 0,
             policyPremium: client.policypremium || '',
-            policyNumbers: client.policynumbers || [],
-            scheduleDocsUrl: client.scheduledocsurl || [],
-            pdfDocsUrl: client.pdfdocsurl || [],
+            policyNumbers: Array.isArray(client.policynumbers) ? client.policynumbers : [],
+            scheduleDocsUrl: Array.isArray(client.scheduledocsurl) ? client.scheduledocsurl : [],
+            pdfDocsUrl: Array.isArray(client.pdfdocsurl) ? client.pdfdocsurl : [],
             deductionDate: client.deductiondate || '',
             issueDate: client.issuedate || '',
-            loaDocUrl: client.loadocurl || ''
+            loaDocUrl: client.loadocurl || '',
+            products: Array.isArray(client.products) ? client.products : []
           }));
           
           setClientsCache(prev => ({ ...prev, [cacheKey]: formattedData }));
@@ -178,7 +180,7 @@ const Dashboard = () => {
     return Array.from(summaryMap.values());
   })();
 
-  // Update clients after add/update/delete - now preserves scroll position
+  // Improved reloadClients function to ensure multi-entry fields are preserved
   const reloadClients = async (preserveScroll = true, optimisticUpdate?: Client) => {
     if (preserveScroll) {
       saveScrollPosition();
@@ -217,12 +219,13 @@ const Dashboard = () => {
           ...client,
           policiesCount: client.policiescount || 0,
           policyPremium: client.policypremium || '',
-          policyNumbers: client.policynumbers || [],
-          scheduleDocsUrl: client.scheduledocsurl || [],
-          pdfDocsUrl: client.pdfdocsurl || [],
+          policyNumbers: Array.isArray(client.policynumbers) ? client.policynumbers : [],
+          scheduleDocsUrl: Array.isArray(client.scheduledocsurl) ? client.scheduledocsurl : [],
+          pdfDocsUrl: Array.isArray(client.pdfdocsurl) ? client.pdfdocsurl : [],
           deductionDate: client.deductiondate || '',
           issueDate: client.issuedate || '',
-          loaDocUrl: client.loadocurl || ''
+          loaDocUrl: client.loadocurl || '',
+          products: Array.isArray(client.products) ? client.products : []
         }));
         
         setClients(formattedData);
