@@ -395,20 +395,26 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   />
                 </TableCell>
                 <TableCell>
-                  <Input 
-                    type="date"
-                    value={client.issueDate}
-                    onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)}
-                    className="bg-transparent border-white/10"
-                  />
+                  <div className="relative flex items-center">
+                    <Input 
+                      type="date"
+                      value={client.issueDate}
+                      onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)}
+                      className="bg-transparent border-white/10 pr-10"
+                    />
+                    <Calendar className="absolute right-3 h-4 w-4 text-white pointer-events-none" />
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <Input 
-                    type="date"
-                    value={client.deductionDate}
-                    onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)}
-                    className="bg-transparent border-white/10"
-                  />
+                  <div className="relative flex items-center">
+                    <Input 
+                      type="date"
+                      value={client.deductionDate}
+                      onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)}
+                      className="bg-transparent border-white/10 pr-10"
+                    />
+                    <Calendar className="absolute right-3 h-4 w-4 text-white pointer-events-none" />
+                  </div>
                 </TableCell>
                 <TableCell>
                   <FileUpload 

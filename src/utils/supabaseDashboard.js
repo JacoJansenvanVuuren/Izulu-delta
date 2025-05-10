@@ -1,3 +1,4 @@
+
 import { supabase } from '../supabase';
 
 // Helper to get table name for a month and year (e.g. 'clients_january')
@@ -170,7 +171,7 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   console.log('Safe Updates:', JSON.stringify(safeUpdates));
 
   try {
-    // Increase timeout by using a longer timeout for the update operation
+    // Perform the update with a smaller payload and no timeout
     const { data, error } = await supabase
       .from(table)
       .update(safeUpdates)
@@ -185,8 +186,9 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
     
     console.log('Update Result:', JSON.stringify(data));
 
-    // Also update in the global clients table - do this without waiting for it to complete
-    await updateGlobalClientFromMonthly({...safeUpdates, name: updates.name || existingRecord.name});
+    // Update global clients table in the background without blocking
+    updateGlobalClientFromMonthly({...safeUpdates, name: updates.name || existingRecord.name})
+      .catch(err => console.error('Background global update failed:', err));
     
     return data?.[0];
   } catch (err) {

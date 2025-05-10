@@ -88,17 +88,25 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
       onClick={!isExpanded ? handleExpandClick : undefined}
     >
       <div className="flex flex-wrap gap-2 items-start">
-        <div className="flex flex-wrap gap-1 inline-flex flex-row">
+        <div className="flex flex-wrap gap-1 inline-flex">
           {localValues.map((item, index) => (
-            <Badge key={index} variant="secondary" className="flex items-center gap-1 bg-secondary/30 mx-0.5 my-0.5 inline-block">
-              {item}
+            <Badge 
+              key={index} 
+              variant="secondary" 
+              className="flex items-center gap-1 bg-secondary/30 mx-0.5 my-0.5 inline-flex"
+              style={{ 
+                maxWidth: 'calc(50% - 4px)', 
+                marginRight: index % 2 === 0 ? '4px' : '0' 
+              }}
+            >
+              <span className="truncate">{item}</span>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   removeItem(index);
                 }}
-                className="ml-1 text-muted-foreground hover:text-white"
+                className="ml-1 flex-shrink-0 text-muted-foreground hover:text-white"
               >
                 <X className="h-3 w-3" />
               </button>
