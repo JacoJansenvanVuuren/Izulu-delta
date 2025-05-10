@@ -38,7 +38,7 @@ const MonthSelector = ({ selectedMonth, setSelectedMonth }: MonthSelectorProps) 
         </Button>
         
         <div className="flex items-center mx-2">
-          <Calendar className="h-4 w-4 mr-2 text-white" /> {/* Changed from text-primary/70 to text-white */}
+          <Calendar className="h-4 w-4 mr-2 text-white" />
           <span className="font-medium">{months[selectedMonth]} {currentYear}</span>
         </div>
 
