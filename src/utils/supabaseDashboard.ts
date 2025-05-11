@@ -137,12 +137,6 @@ async function updateGlobalClientFromMonthly(client: any) {
   
   console.log('Updating global client from monthly:', client.name);
   
-  // Check if client with this name already exists in global table
-  const { data: existingClients } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('name', client.name);
-  
   // Get all monthly data for this client to aggregate
   const { data: allMonthlyData } = await getAllMonthlyDataForClient(client.name);
   
@@ -151,21 +145,19 @@ async function updateGlobalClientFromMonthly(client: any) {
   // Aggregate data from all months
   const aggregatedData = aggregateClientData(allMonthlyData);
   
-  // Update or insert into global clients table
-  if (existingClients && existingClients.length > 0) {
-    console.log('Updating existing client in global table:', client.name);
-    await supabase
-      .from('clients')
-      .update(aggregatedData)
-      .eq('name', client.name);
-  } else {
-    console.log('Creating new client in global table:', client.name);
-    await supabase
-      .from('clients')
-      .insert([{ 
-        name: client.name,
-        ...aggregatedData 
-      }]);
+  // Always perform an upsert to ensure all data is captured
+  const { error } = await supabase
+    .from('clients')
+    .upsert({
+      name: client.name,
+      ...aggregatedData
+    }, {
+      onConflict: 'name'
+    });
+  
+  if (error) {
+    console.error('Error updating global client:', error);
+    throw error;
   }
 }
 
@@ -258,10 +250,18 @@ function aggregateClientData(monthlyData: any[]) {
     
     // Sum up policy premium (convert from string if needed)
     if (record.policypremium) {
-      const premiumStr = String(record.policypremium).replace(/[^0-9.]/g, '');
-      const premium = parseFloat(premiumStr);
-      if (!isNaN(premium)) {
-        result.policy_premium += premium;
+      let premium = 0;
+      // Handle various input formats
+      const premiumStr = String(record.policypremium)
+        .replace(/[R\s]/g, '') // Remove 'R' and whitespace
+        .replace(/,/g, ''); // Remove commas
+      
+      // Try parsing as float
+      const parsedPremium = parseFloat(premiumStr);
+      
+      // Validate and add to total
+      if (!isNaN(parsedPremium) && parsedPremium > 0) {
+        result.policy_premium += parsedPremium;
       }
     }
   });

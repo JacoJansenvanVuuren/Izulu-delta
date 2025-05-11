@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
-import { Plus, Trash2, Search, FileText, AlertCircle, Calendar, Save } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Client {
@@ -319,9 +319,16 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
         policyPremium: ''
       };
 
+      // Immediately add the new client to the top of the list
+      setClients(prevClients => [newClient, ...prevClients]);
+
       onAddClient(newClient, (err) => {
         setActionLoading(false);
-        if (err) setActionError(err);
+        if (err) {
+          setActionError(err);
+          // Remove the temporary client if there's an error
+          setClients(prevClients => prevClients.filter(c => c.id !== newClient.id));
+        }
       });
     } catch (error: any) {
       setActionLoading(false);
@@ -486,13 +493,10 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                       type="date"
                       value={client.issueDate}
                       onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)}
-                      className="bg-transparent border-white/10 pr-10"
+                      className="bg-transparent border-white/10 w-full"
                       style={{ colorScheme: 'dark' }}
                     />
-                    <Calendar 
-                      className="absolute right-3 h-4 w-4 text-white cursor-pointer" 
-                      onClick={() => handleDateIconClick(`issue-date-${client.id}`)}
-                    />
+
                   </div>
                 </TableCell>
                 <TableCell>
@@ -502,13 +506,10 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                       type="date"
                       value={client.deductionDate}
                       onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)}
-                      className="bg-transparent border-white/10 pr-10"
+                      className="bg-transparent border-white/10 w-full"
                       style={{ colorScheme: 'dark' }}
                     />
-                    <Calendar 
-                      className="absolute right-3 h-4 w-4 text-white cursor-pointer" 
-                      onClick={() => handleDateIconClick(`deduction-date-${client.id}`)}
-                    />
+
                   </div>
                 </TableCell>
                 <TableCell>

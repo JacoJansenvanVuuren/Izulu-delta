@@ -350,7 +350,7 @@ const Dashboard = () => {
                       
                       // Immediately update local state
                       if (clients) {
-                        const updatedClients = [...clients, newClient];
+                        const updatedClients = [newClient, ...clients];
                         setClients(updatedClients);
                         setClientsCache(prev => ({
                           ...prev, 

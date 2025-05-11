@@ -82,24 +82,24 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
   return (
     <div 
       ref={containerRef}
-      className={`border rounded p-2 transition-all duration-200 bg-transparent border-white/10 min-h-[40px] ${
-        isExpanded ? 'w-full min-w-[300px]' : 'w-full cursor-pointer hover:bg-white/5'
+      className={`border rounded p-1 transition-all duration-200 bg-transparent border-white/10 h-[38px] w-full min-w-[250px] ${
+        isExpanded ? '' : 'cursor-pointer hover:bg-white/5'
       }`}
       onClick={!isExpanded ? handleExpandClick : undefined}
     >
-      <div className="flex flex-wrap gap-2 items-start">
-        <div className="flex flex-wrap gap-1 inline-flex">
+      <div className="flex flex-wrap gap-1 items-center justify-center h-full">
+        <div className="flex flex-wrap gap-1 w-full">
           {localValues.map((item, index) => (
             <Badge 
               key={index} 
               variant="secondary" 
               className="flex items-center gap-1 bg-secondary/30 mx-0.5 my-0.5 inline-flex"
               style={{ 
-                maxWidth: 'calc(50% - 4px)', 
-                marginRight: index % 2 === 0 ? '4px' : '0' 
+                maxWidth: 'none', 
+                marginRight: '4px' 
               }}
             >
-              <span className="truncate">{item}</span>
+              <span className="break-words">{item}</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -128,7 +128,7 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
         )}
         
         {!isExpanded && localValues.length === 0 && (
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-sm w-full text-center flex items-center justify-center h-full -mt-1">
             {placeholder || "Click to add items..."}
           </span>
         )}

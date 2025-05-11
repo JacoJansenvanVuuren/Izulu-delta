@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const months = [
@@ -38,7 +38,6 @@ const MonthSelector = ({ selectedMonth, setSelectedMonth }: MonthSelectorProps) 
         </Button>
         
         <div className="flex items-center mx-2">
-          <Calendar className="h-4 w-4 mr-2 text-white" />
           <span className="font-medium">{months[selectedMonth]} {currentYear}</span>
         </div>
 
