@@ -1,10 +1,20 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { uploadPdf } from '../utils/supabaseDashboard';
+import { ProductOption } from '../utils/supabaseDashboard';
+
+// Define the product options
+const PRODUCT_OPTIONS: ProductOption[] = [
+  'Value Funeral Plan', 
+  'Enhanced Priority Plan', 
+  'All in One Funeral', 
+  'Immediate Life Cover'
+];
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
@@ -22,7 +32,7 @@ interface Client {
   policyNumbers: string[];
   issueDate: string;
   deductionDate: string;
-  loaDocUrl?: string;
+  loaDocUrl?: string[];
   policyPremium: string;
 }
 
@@ -189,7 +199,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
-  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', file: File) => {
+  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl' | 'loaDocUrl', file: File) => {
     setActionLoading(true);
     setActionError(null);
     try {
@@ -218,7 +228,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
-  const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl', index: number) => {
+  const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl' | 'loaDocUrl', index: number) => {
     setActionLoading(true);
     setActionError(null);
     try {
@@ -416,7 +426,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
               <TableHead className="text-left font-medium w-48 py-4">Client Name</TableHead>
               <TableHead className="text-left font-medium w-40">Location</TableHead>
               <TableHead className="text-left font-medium">Number of Policies</TableHead>
-              <TableHead className="text-left font-medium w-48">Products</TableHead>
+              <TableHead className="text-left font-medium w-64">Products</TableHead>
               <TableHead className="text-left font-medium">Schedule docs</TableHead>
               <TableHead className="text-left font-medium">PDF DOC's</TableHead>
               <TableHead className="text-left font-medium w-48">Policy Numbers</TableHead>
@@ -457,11 +467,24 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   />
                 </TableCell>
                 <TableCell>
-                  <MultiEntryField 
-                    values={client.products}
-                    onChange={(values) => updateMultiEntryField(client.id, 'products', values)}
-                    placeholder="Add a product"
-                  />
+                  <Select
+                    value={client.products[0] || ''}
+                    onValueChange={(value) => {
+                      const newProducts = [value];
+                      updateMultiEntryField(client.id, 'products', newProducts);
+                    }}
+                  >
+                    <SelectTrigger className="w-full min-w-[250px]">
+                      <SelectValue placeholder="Select Product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCT_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell>
                   <MultiFileUpload 
@@ -513,10 +536,11 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   </div>
                 </TableCell>
                 <TableCell>
-                  <FileUpload 
-                    onFileUpload={(file) => handleFileUpload(client.id, 'loaDocUrl', file)}
-                    label="LOA and Cancellation Letter"
-                    fileUrl={client.loaDocUrl}
+                  <MultiFileUpload 
+                    onFileUpload={(file) => handleMultiFileUpload(client.id, 'loaDocUrl', file)}
+                    files={client.loaDocUrl || []}
+                    onRemove={(index) => removeFile(client.id, 'loaDocUrl', index)}
+                    label="LOA and Cancellation Letters"
                   />
                 </TableCell>
                 <TableCell>

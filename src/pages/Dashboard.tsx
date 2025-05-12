@@ -26,7 +26,7 @@ interface Client {
   policyNumbers: string[];
   issueDate: string;
   deductionDate: string;
-  loaDocUrl?: string;
+  loaDocUrl?: string[];
   policyPremium: string;
 }
 
@@ -89,7 +89,7 @@ const Dashboard = () => {
             pdfDocsUrl: client.pdfdocsurl || [],
             deductionDate: client.deductiondate || '',
             issueDate: client.issuedate || '',
-            loaDocUrl: client.loadocurl || ''
+            loaDocUrl: client.loadocurl ? (Array.isArray(client.loadocurl) ? client.loadocurl : [client.loadocurl]) : []
           }));
           
           setClientsCache(prev => ({ ...prev, [cacheKey]: formattedData }));
@@ -117,7 +117,7 @@ const Dashboard = () => {
             pdfDocsUrl: client.pdfdocsurl || [],
             deductionDate: client.deductiondate || '',
             issueDate: client.issuedate || '',
-            loaDocUrl: client.loadocurl || ''
+            loaDocUrl: client.loadocurl ? (Array.isArray(client.loadocurl) ? client.loadocurl : [client.loadocurl]) : []
           }));
           
           setClientsCache(prev => ({ ...prev, [cacheKey]: formattedData }));
@@ -222,7 +222,7 @@ const Dashboard = () => {
           pdfDocsUrl: client.pdfdocsurl || [],
           deductionDate: client.deductiondate || '',
           issueDate: client.issuedate || '',
-          loaDocUrl: client.loadocurl || ''
+          loaDocUrl: client.loadocurl ? (Array.isArray(client.loadocurl) ? client.loadocurl : [client.loadocurl]) : []
         }));
         
         setClients(formattedData);

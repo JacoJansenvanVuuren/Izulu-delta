@@ -7,7 +7,7 @@ import { FileUp, X } from 'lucide-react';
 
 interface MultiFileUploadProps {
   onFileUpload: (file: File) => void;
-  files: string[];
+  files: string[] | undefined;
   onRemove: (index: number) => void;
   label: string;
 }

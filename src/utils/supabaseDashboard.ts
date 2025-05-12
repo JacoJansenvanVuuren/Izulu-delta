@@ -1,6 +1,45 @@
 
 import { supabase } from '../supabase';
 
+// Define a type for the database client mapping
+interface DatabaseClientMapping {
+  name: string;
+  location: string;
+  deductiondate: string;
+  policiescount: number;
+  scheduledocsurl: string[];
+  loadocurl: string[];
+  pdfdocsurl: string[];
+  policynumbers: string[];
+  issuedate: string;
+  products: ProductOption[];
+  year: number;
+  client_id?: string;
+  created_at?: string;
+  id?: string;
+  policypremium?: string;
+}
+
+// Define the product options as a type
+export type ProductOption = 'Value Funeral Plan' | 'Enhanced Priority Plan' | 'All in One Funeral' | 'Immediate Life Cover';
+
+// Validate and ensure the product option is one of the allowed types
+export function validateProductOption(product: any): ProductOption {
+  const validProducts: ProductOption[] = [
+    'Value Funeral Plan', 
+    'Enhanced Priority Plan', 
+    'All in One Funeral', 
+    'Immediate Life Cover'
+  ];
+
+  if (typeof product !== 'string' || !validProducts.includes(product as ProductOption)) {
+    // Default to the first product if invalid
+    return validProducts[0];
+  }
+
+  return product as ProductOption;
+}
+
 // Helper to get table name for a month and year (e.g. 'clients_january')
 export function getMonthlyTableName(monthIndex: number) {
   const months = [
@@ -23,39 +62,29 @@ export async function fetchMonthlyClients(monthIndex: number, year: number) {
 }
 
 // Helper to map camelCase client fields to all-lowercase, no-underscore
-function mapClientForDb(client: any) {
-  const dbClient = {
-    ...client,
-    deductiondate: client.deductionDate || client.deductiondate,
-    policiescount: client.policiesCount || client.policiescount,
-    scheduledocsurl: client.scheduleDocsUrl || client.scheduledocsurl,
-    pdfdocsurl: client.pdfDocsUrl || client.pdfdocsurl,
-    policynumbers: client.policyNumbers || client.policynumbers,
-    issuedate: client.issueDate || client.issuedate,
-    loadocurl: client.loaDocUrl || client.loadocurl,
-    policypremium: client.policyPremium || client.policypremium,
-    // Add more mappings as needed
-    name: client.name,
-    location: client.location,
-    products: client.products,
-    year: client.year,
+function mapClientForDb(client: any): DatabaseClientMapping {
+  const dbClient: DatabaseClientMapping = {
+    name: client.name || '',
+    location: client.location || '',
+    deductiondate: client.deductionDate || client.deductiondate || '',
+    policiescount: Number(client.policiesCount || client.policiescount || 0),
+    scheduledocsurl: Array.isArray(client.scheduleDocsUrl) ? client.scheduleDocsUrl : (client.scheduleDocsUrl ? [client.scheduleDocsUrl] : []),
+    loadocurl: Array.isArray(client.loaDocUrl) ? client.loaDocUrl : (client.loaDocUrl ? [client.loaDocUrl] : []),
+    pdfdocsurl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : (client.pdfDocsUrl ? [client.pdfDocsUrl] : []),
+    policynumbers: Array.isArray(client.policyNumbers) ? client.policyNumbers : (client.policyNumbers ? [client.policyNumbers] : []),
+    issuedate: client.issueDate || client.issuedate || '',
+    products: client.products ? client.products.map(validateProductOption) : [],
+    year: Number(client.year || new Date().getFullYear()),
     client_id: client.client_id,
     created_at: client.created_at,
-    // id will be conditionally added below
+    policypremium: client.policyPremium || client.policypremium || '',
   };
-  // Remove all camelCase properties that could cause schema errors
-  delete dbClient.deductionDate;
-  delete dbClient.policiesCount;
-  delete dbClient.scheduleDocsUrl;
-  delete dbClient.pdfDocsUrl;
-  delete dbClient.policyNumbers;
-  delete dbClient.issueDate;
-  delete dbClient.loaDocUrl;
-  delete dbClient.policyPremium;
-  // Remove id unless it is defined and not null (prevents NOT NULL constraint errors)
-  if (dbClient.id === undefined || dbClient.id === null) {
-    delete dbClient.id;
+
+  // Conditionally add id if it exists
+  if (client.id && typeof client.id === 'string') {
+    dbClient.id = client.id;
   }
+
   return dbClient;
 }
 
