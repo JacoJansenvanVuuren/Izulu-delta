@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
+import MultiDateField from './MultiDateField';
 import { Plus, Trash2, Search, FileText, AlertCircle, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -30,8 +31,8 @@ interface Client {
   scheduleDocsUrl?: string[];
   pdfDocsUrl?: string[];
   policyNumbers: string[];
-  issueDate: string;
-  deductionDate: string;
+  issueDate: string | string[] | Date[] | undefined;
+  deductionDate: string | string[] | Date[] | undefined;
   loaDocUrl?: string[];
   policyPremium: string;
 }
@@ -64,7 +65,13 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     products: Array.isArray(client.products) ? client.products : [],
     policyNumbers: Array.isArray(client.policyNumbers) ? client.policyNumbers : (client.policyNumbers ? [client.policyNumbers] : []),
     scheduleDocsUrl: Array.isArray(client.scheduleDocsUrl) ? client.scheduleDocsUrl : (client.scheduleDocsUrl ? [client.scheduleDocsUrl] : []),
-    pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : (client.pdfDocsUrl ? [client.pdfDocsUrl] : [])
+    pdfDocsUrl: Array.isArray(client.pdfDocsUrl) ? client.pdfDocsUrl : (client.pdfDocsUrl ? [client.pdfDocsUrl] : []),
+    issueDate: Array.isArray(client.issueDate) 
+      ? client.issueDate.map(d => d instanceof Date ? d : new Date(d)) 
+      : (client.issueDate ? [new Date(client.issueDate)] : []),
+    deductionDate: Array.isArray(client.deductionDate) 
+      ? client.deductionDate.map(d => d instanceof Date ? d : new Date(d)) 
+      : (client.deductionDate ? [new Date(client.deductionDate)] : [])
   }));
 
   // Track original clients to detect changes
@@ -511,28 +518,36 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                 </TableCell>
                 <TableCell>
                   <div className="relative flex items-center">
-                    <Input 
-                      id={`issue-date-${client.id}`}
-                      type="date"
-                      value={client.issueDate}
-                      onChange={(e) => updateClientField(client.id, 'issueDate', e.target.value)}
-                      className="bg-transparent border-white/10 w-full"
-                      style={{ colorScheme: 'dark' }}
+                    <MultiDateField
+                      label="Issue Date"
+                      fieldName="issueDate"
+                      className="w-full"
+                      value={unsavedChanges[client.id]?.issueDate ?? client.issueDate}
+                      onChange={(dates: Date[]) => {
+                        setUnsavedChanges(prev => ({
+                          ...prev,
+                          [client.id]: { ...(prev[client.id] || {}), issueDate: dates.map(d => d.toISOString()) }
+                        }));
+                        setHasUnsavedChanges(true);
+                      }}
                     />
-
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="relative flex items-center">
-                    <Input 
-                      id={`deduction-date-${client.id}`}
-                      type="date"
-                      value={client.deductionDate}
-                      onChange={(e) => updateClientField(client.id, 'deductionDate', e.target.value)}
-                      className="bg-transparent border-white/10 w-full"
-                      style={{ colorScheme: 'dark' }}
+                    <MultiDateField
+                      label="Deduction Date"
+                      fieldName="deductionDate"
+                      className="w-full"
+                      value={unsavedChanges[client.id]?.deductionDate ?? client.deductionDate}
+                      onChange={(dates: Date[]) => {
+                        setUnsavedChanges(prev => ({
+                          ...prev,
+                          [client.id]: { ...(prev[client.id] || {}), deductionDate: dates.map(d => d.toISOString()) }
+                        }));
+                        setHasUnsavedChanges(true);
+                      }}
                     />
-
                   </div>
                 </TableCell>
                 <TableCell>
