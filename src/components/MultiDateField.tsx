@@ -96,7 +96,7 @@ export default function MultiDateField({
         
         return null;
       })
-      .filter((date): date is Date => date !== null);
+      .filter((date): date is Date => date !== null && !isNaN(date.getTime()));
   };
 
   const [dates, setDates] = useState<Date[]>(convertToDates(initialDates));
@@ -181,7 +181,10 @@ export default function MultiDateField({
       <input 
         type="hidden" 
         name={fieldName} 
-        value={JSON.stringify(dates.map(d => d.toISOString()))} 
+        value={JSON.stringify(dates
+          .filter(d => d instanceof Date && !isNaN(d.getTime()))
+          .map(d => d.toISOString())
+        )} 
       />
     </div>
   );
