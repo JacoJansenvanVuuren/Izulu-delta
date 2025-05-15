@@ -201,12 +201,13 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
 export async function deleteMonthlyClient(monthIndex, year, id) {
   const table = getMonthlyTableName(monthIndex);
   // First, get the client to be deleted to update global table
-  const { data: clientData } = await supabase
+  const { data: clientDataArray } = await supabase
     .from(table)
     .select('*')
     .eq('id', id)
-    .eq('year', year)
-    .single();
+    .eq('year', year);
+    
+  const clientData = clientDataArray?.[0];
   
   // Delete from monthly table
   const { error } = await supabase

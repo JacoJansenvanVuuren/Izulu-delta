@@ -130,54 +130,71 @@ export default function MultiDateField({
       className={`relative ${className}`} 
       style={{ width: '180px', outline: 'none', boxShadow: 'none' }}
     >
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        {label}
-      </label>
       <div 
-        className="flex flex-wrap items-center gap-1.5 bg-[#1e1e1e] border border-gray-700 rounded-md p-1.5 min-h-[42px] w-full"
-        style={{ outline: 'none', boxShadow: 'none' }}
+        className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background p-1.5 min-h-[42px] w-full relative focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-colors"
       >
-        {dates.map((date, index) => (
-          <div 
-            key={index} 
-            className="flex items-center bg-[#2a2a2a] text-gray-300 rounded-md px-2 py-0.5 text-xs"
-          >
-            {date.toLocaleDateString()}
-            <button 
-              onClick={() => handleRemoveDate(date)}
-              className="ml-1.5 text-gray-500 hover:text-gray-200"
+        <label 
+          className={`absolute text-xs text-gray-400 transition-all duration-200 ${dates.length > 0 ? 'opacity-0' : 'top-1/2 left-2 -translate-y-1/2'}`}
+        >
+          {label}
+        </label>
+        <div className="flex flex-wrap items-center gap-1.5 pr-8 w-full">
+          {dates.map((date, index) => (
+            <div 
+              key={index} 
+              className="flex items-center bg-secondary text-secondary-foreground rounded-md px-2 py-0.5 text-xs group"
             >
-              <Cross2Icon className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
+              {date.toLocaleDateString()}
+              <button 
+                onClick={() => handleRemoveDate(date)}
+                className="ml-1.5 text-gray-500 hover:text-gray-200 z-10 group-hover:text-gray-200"
+              >
+                <Cross2Icon className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
         
-        <div className="relative ml-auto">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
           <button 
             onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
             className="text-gray-500 hover:text-gray-300"
           >
             <PlusIcon className="w-4 h-4" />
           </button>
-          
-          {isDatePickerOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2">
-              <DatePicker
-                selected={null}
-                onChange={handleAddDate}
-                inline
-                calendarClassName="bg-[#121212] text-white"
-                dayClassName={(date) => 
-                  "hover:bg-[#333] " + 
-                  (dates.some(d => d.toDateString() === date.toDateString()) 
-                    ? "bg-[#3a86ff] text-white" 
-                    : "")
-                }
-              />
-            </div>
-          )}
         </div>
       </div>
+
+      {isDatePickerOpen && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsDatePickerOpen(false);
+            }
+          }}
+        >
+          <div className="relative bg-background rounded-lg p-4 shadow-lg">
+            <button 
+              onClick={() => setIsDatePickerOpen(false)}
+              className="absolute right-2 top-2 text-gray-500 hover:text-gray-300"
+            >
+              <Cross2Icon className="w-4 h-4" />
+            </button>
+            <DatePicker
+              selected={null}
+              onChange={handleAddDate}
+              inline
+              calendarClassName="bg-background text-foreground"
+              dayClassName={(date) => {
+                const isSelected = dates.some(d => d.toDateString() === date.toDateString());
+                return `rounded-md hover:bg-gray-700/30 ${isSelected ? 'bg-[#4ade80]/20 text-[#4ade80]' : ''}`;
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <input 
         type="hidden" 
         name={fieldName} 

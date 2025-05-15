@@ -44,6 +44,19 @@
 }
 
 @layer utilities {
+  /* Date input styling */
+  input[type="date"] {
+    @apply px-4 py-2 rounded-lg bg-secondary border border-border/50 text-foreground outline-none transition-all duration-200;
+  }
+
+  input[type="date"]:focus {
+    @apply border-white/30 ring-1 ring-white/20;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    @apply filter invert opacity-70 hover:opacity-100 transition-opacity cursor-pointer;
+  }
+
   .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;
