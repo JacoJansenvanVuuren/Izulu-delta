@@ -35,6 +35,7 @@ interface Client {
   deductionDate: string | string[] | Date[] | undefined;
   loaDocUrl?: string[];
   policyPremium: string;
+  stopOrder?: boolean;
 }
 
 interface ClientTableProps {
@@ -441,6 +442,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
               <TableHead className="text-left font-medium">Deduction date</TableHead>
               <TableHead className="text-left font-medium">LOA and cancellation</TableHead>
               <TableHead className="text-left font-medium w-32">Policy premium</TableHead>
+              <TableHead className="text-left font-medium w-20">Stop Order</TableHead>
               <TableHead className="text-left font-medium w-16">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -568,6 +570,22 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                         updateClientField(client.id, 'policyPremium', value);
                       }}
                       className="bg-transparent border-white/10 w-full min-w-[130px] pl-7"
+                    />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={client.stopOrder || false}
+                      onChange={(e) => {
+                        updateClientField(client.id, 'stopOrder', e.target.checked);
+                      }}
+                      className="w-5 h-5 rounded-full"
+                      style={{
+                        background: client.stopOrder ? 'green' : 'red',
+                        borderColor: client.stopOrder ? 'green' : 'red'
+                      }}
                     />
                   </div>
                 </TableCell>
