@@ -82,21 +82,22 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
   return (
     <div 
       ref={containerRef}
-      className={`border rounded p-1 transition-all duration-200 bg-transparent border-white/10 h-[38px] w-full min-w-[250px] ${
+      className={`border rounded-lg p-1 transition-all duration-200 bg-transparent border-white/10 h-auto min-h-[38px] w-full min-w-[250px] relative overflow-hidden ${
         isExpanded ? '' : 'cursor-pointer hover:bg-white/5'
       }`}
       onClick={!isExpanded ? handleExpandClick : undefined}
     >
-      <div className="flex flex-wrap gap-1 items-center justify-center h-full">
+      <div className="flex flex-wrap gap-1 items-start justify-start">
         <div className="flex flex-wrap gap-1 w-full">
           {localValues.map((item, index) => (
             <Badge 
               key={index} 
               variant="secondary" 
-              className="flex items-center gap-1 bg-secondary/30 mx-0.5 my-0.5 inline-flex"
+              className="flex items-center gap-1 bg-secondary/30 px-2 py-0.5 inline-flex"
               style={{ 
                 maxWidth: 'none', 
-                marginRight: '4px' 
+                marginRight: '4px',
+                whiteSpace: 'nowrap'
               }}
             >
               <span className="break-words">{item}</span>
@@ -121,16 +122,14 @@ const MultiEntryField = ({ values = [], onChange, placeholder, onBlur }: MultiEn
               value={currentInput}
               onChange={(e) => setCurrentInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder || "Add new item..."}
-              className="border-0 p-0 h-8 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              placeholder={placeholder || "Add a policy number..."}
+              className="border-0 p-2 h-8 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 w-full text-center"
             />
           </div>
         )}
         
         {!isExpanded && localValues.length === 0 && (
-          <span className="text-muted-foreground text-sm w-full text-center flex items-center justify-center h-full -mt-1">
-            {placeholder || "Click to add items..."}
-          </span>
+          <span className="text-muted-foreground text-sm w-full flex items-center justify-center h-full">Add a policy number...</span>
         )}
       </div>
     </div>

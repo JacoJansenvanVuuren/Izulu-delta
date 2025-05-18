@@ -26,6 +26,7 @@ interface Client {
   id: string;
   name: string;
   location: string;
+  fnaSummaryUrl?: string[];
   policiesCount: number;
   products: string[];
   scheduleDocsUrl?: string[];
@@ -207,7 +208,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
-  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl' | 'loaDocUrl', file: File) => {
+  const handleMultiFileUpload = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl' | 'loaDocUrl' | 'fnaSummaryUrl', file: File) => {
     setActionLoading(true);
     setActionError(null);
     try {
@@ -236,7 +237,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
     }
   };
 
-  const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl' | 'loaDocUrl', index: number) => {
+  const removeFile = async (clientId: string, field: 'scheduleDocsUrl' | 'pdfDocsUrl' | 'loaDocUrl' | 'fnaSummaryUrl', index: number) => {
     setActionLoading(true);
     setActionError(null);
     try {
@@ -433,6 +434,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
             <TableRow>
               <TableHead className="text-left font-medium w-48 py-4">Client Name</TableHead>
               <TableHead className="text-left font-medium w-40">Location</TableHead>
+              <TableHead className="text-left font-medium w-40">FNA Summary</TableHead>
               <TableHead className="text-left font-medium">Number of Policies</TableHead>
               <TableHead className="text-left font-medium w-64">Products</TableHead>
               <TableHead className="text-left font-medium">Schedule docs</TableHead>
@@ -442,7 +444,8 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
               <TableHead className="text-left font-medium">Deduction date</TableHead>
               <TableHead className="text-left font-medium">LOA and cancellation</TableHead>
               <TableHead className="text-left font-medium w-32">Policy premium</TableHead>
-              <TableHead className="text-left font-medium w-20">Stop Order</TableHead>
+              <TableHead className="text-left font-medium w-40">FA Summary</TableHead>
+              <TableHead className="text-left font-medium w-40">Deduction Type</TableHead>
               <TableHead className="text-left font-medium w-16">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -465,6 +468,14 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                     value={client.location} 
                     onChange={(e) => updateClientField(client.id, 'location', e.target.value)}
                     className="bg-transparent border-white/10 w-full min-w-[120px] expandable-input" 
+                  />
+                </TableCell>
+                <TableCell>
+                  <MultiFileUpload 
+                    onFileUpload={(file) => handleMultiFileUpload(client.id, 'fnaSummaryUrl', file)}
+                    files={client.fnaSummaryUrl || []}
+                    onRemove={(index) => removeFile(client.id, 'fnaSummaryUrl', index)}
+                    label="FNA Summary"
                   />
                 </TableCell>
                 <TableCell>
@@ -574,20 +585,29 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={client.stopOrder || false}
-                      onChange={(e) => {
-                        updateClientField(client.id, 'stopOrder', e.target.checked);
-                      }}
-                      className="w-5 h-5 rounded-full"
-                      style={{
-                        background: client.stopOrder ? 'green' : 'red',
-                        borderColor: client.stopOrder ? 'green' : 'red'
-                      }}
-                    />
-                  </div>
+                  <MultiFileUpload 
+                    onFileUpload={(file) => handleMultiFileUpload(client.id, 'fnaSummaryUrl', file)}
+                    files={client.fnaSummaryUrl || []}
+                    onRemove={(index) => removeFile(client.id, 'fnaSummaryUrl', index)}
+                    label="FNA Summary"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Select
+                    value={client.stopOrder ? 'Deductions Exceeded' : ''}
+                    onValueChange={(value) => {
+                      updateClientField(client.id, 'stopOrder', value !== '');
+                    }}
+                  >
+                    <SelectTrigger className="w-full min-w-[200px]">
+                      <SelectValue placeholder="Select Deduction Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Deductions Exceeded">Deductions Exceeded</SelectItem>
+                      <SelectItem value="Debi-Check">Debi-Check</SelectItem>
+                      <SelectItem value="Pending Stop Order">Pending Stop Order</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">
