@@ -325,10 +325,12 @@ const Dashboard = () => {
                     }, 0).toLocaleString()}</p>
                   </div>
                   <div className="glass-morphism rounded-lg p-4">
-                    <h3 className="text-muted-foreground text-sm mb-1">Active Products</h3>
-                    <p className="text-2xl font-bold">{new Set(clients?.flatMap(client => 
-                      Array.isArray(client.products) ? client.products : []
-                    ) || []).size}</p>
+                    <h3 className="text-muted-foreground text-sm mb-1">Active Policies</h3>
+                    <p className="text-2xl font-bold">{
+                      clients?.reduce((total, client) => 
+                        total + (Array.isArray(client.products) ? client.products.length : 0), 0
+                      ) || 0
+                    }</p>
                   </div>
                 </div>
               )}

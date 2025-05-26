@@ -19,7 +19,7 @@ import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import MultiEntryField from '@/components/MultiEntryField';
 import MultiDateField from './MultiDateField';
-import { Plus, Trash2, Search, FileText, AlertCircle, Save } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, AlertCircle, Save, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Client {
@@ -49,6 +49,7 @@ interface ClientTableProps {
 }
 
 const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient, selectedMonth, currentYear }: ClientTableProps): JSX.Element | null => {
+  const [selectedProduct, setSelectedProduct] = useState('');
   // Ensure initialClients is always an array
   const safeInitialClients = initialClients || [];
 
@@ -444,7 +445,6 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
               <TableHead className="text-left font-medium">Deduction date</TableHead>
               <TableHead className="text-left font-medium">LOA and cancellation</TableHead>
               <TableHead className="text-left font-medium w-32">Policy premium</TableHead>
-              <TableHead className="text-left font-medium w-40">FA Summary</TableHead>
               <TableHead className="text-left font-medium w-40">Deduction Type</TableHead>
               <TableHead className="text-left font-medium w-16">Actions</TableHead>
             </TableRow>
@@ -487,24 +487,55 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   />
                 </TableCell>
                 <TableCell>
-                  <Select
-                    value={client.products[0] || ''}
-                    onValueChange={(value) => {
-                      const newProducts = [value];
-                      updateMultiEntryField(client.id, 'products', newProducts);
-                    }}
-                  >
-                    <SelectTrigger className="w-full min-w-[250px]">
-                      <SelectValue placeholder="Select Product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRODUCT_OPTIONS.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
+                  <div className="min-w-[250px]">
+                    <div className="grid grid-cols-2 gap-1 mb-1">
+                      {client.products.map((product, index) => (
+                        <div 
+                          key={index}
+                          className="inline-flex items-center gap-1 bg-secondary/30 text-secondary-foreground text-[11px] px-2 py-0.5 rounded-full overflow-hidden"
+                        >
+                          <span className="truncate">{product}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newProducts = client.products.filter((_, i) => i !== index);
+                              updateMultiEntryField(client.id, 'products', newProducts);
+                            }}
+                            className="flex-shrink-0 text-muted-foreground hover:text-foreground ml-0.5"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                    <Select
+                      value={selectedProduct}
+                      onValueChange={(value) => {
+                        if (value && !client.products.includes(value)) {
+                          const newProducts = [...client.products, value];
+                          updateMultiEntryField(client.id, 'products', newProducts);
+                          setSelectedProduct(''); // Reset the selected value
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Add Product" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRODUCT_OPTIONS.map((option) => (
+                          <SelectItem 
+                            key={option} 
+                            value={option}
+                            disabled={client.products.includes(option)}
+                            className="text-sm"
+                          >
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <MultiFileUpload 
@@ -585,14 +616,6 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                   </div>
                 </TableCell>
                 <TableCell>
-                  <MultiFileUpload 
-                    onFileUpload={(file) => handleMultiFileUpload(client.id, 'fnaSummaryUrl', file)}
-                    files={client.fnaSummaryUrl || []}
-                    onRemove={(index) => removeFile(client.id, 'fnaSummaryUrl', index)}
-                    label="FNA Summary"
-                  />
-                </TableCell>
-                <TableCell>
                   <Select
                     value={client.stopOrder ? 'Deductions Exceeded' : ''}
                     onValueChange={(value) => {
@@ -606,6 +629,7 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                       <SelectItem value="Deductions Exceeded">Deductions Exceeded</SelectItem>
                       <SelectItem value="Debi-Check">Debi-Check</SelectItem>
                       <SelectItem value="Pending Stop Order">Pending Stop Order</SelectItem>
+                      <SelectItem value="Stop Order">Stop Order</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>
