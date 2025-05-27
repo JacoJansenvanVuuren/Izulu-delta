@@ -36,7 +36,7 @@ interface Client {
   deductionDate: string | string[] | Date[] | undefined;
   loaDocUrl?: string[];
   policyPremium: string;
-  stopOrder?: boolean;
+  stopOrder?: string;
 }
 
 interface ClientTableProps {
@@ -617,15 +617,16 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                 </TableCell>
                 <TableCell>
                   <Select
-                    value={client.stopOrder ? 'Deductions Exceeded' : ''}
+                    value={client.stopOrder || undefined}
                     onValueChange={(value) => {
-                      updateClientField(client.id, 'stopOrder', value !== '');
+                      updateClientField(client.id, 'stopOrder', value || '');
                     }}
                   >
                     <SelectTrigger className="w-full min-w-[200px]">
                       <SelectValue placeholder="Select Deduction Type" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
                       <SelectItem value="Deductions Exceeded">Deductions Exceeded</SelectItem>
                       <SelectItem value="Debi-Check">Debi-Check</SelectItem>
                       <SelectItem value="Pending Stop Order">Pending Stop Order</SelectItem>
