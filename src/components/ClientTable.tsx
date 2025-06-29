@@ -617,9 +617,9 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                 </TableCell>
                 <TableCell>
                   <Select
-                    value={client.stopOrder || undefined}
+                    value={client.stopOrder || 'none'}
                     onValueChange={(value) => {
-                      updateClientField(client.id, 'stopOrder', value || '');
+                      updateClientField(client.id, 'stopOrder', value === 'none' ? '' : value);
                     }}
                   >
                     <SelectTrigger className="w-full min-w-[200px]">
