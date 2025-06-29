@@ -50,8 +50,21 @@ interface ClientTableProps {
 
 const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClient, selectedMonth, currentYear }: ClientTableProps): JSX.Element | null => {
   const [selectedProduct, setSelectedProduct] = useState('');
+  // Deduction type cache for localStorage persistence
+  const [deductionTypeCache, setDeductionTypeCache] = useState<Record<string, string>>({});
   // Ensure initialClients is always an array
   const safeInitialClients = initialClients || [];
+
+  // On mount, load deduction type selections from localStorage
+  useEffect(() => {
+    const cache: Record<string, string> = {};
+    safeInitialClients.forEach(client => {
+      const stored = localStorage.getItem(`deductionType_${client.id}`);
+      if (stored) cache[client.id] = stored;
+    });
+    setDeductionTypeCache(cache);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeInitialClients.length]);
 
   // Return loading state if clients are null or empty and no ability to add
   if (safeInitialClients.length === 0 && !onAddClient) return (
@@ -617,9 +630,15 @@ const ClientTable = ({ initialClients, onAddClient, onUpdateClient, onDeleteClie
                 </TableCell>
                 <TableCell>
                   <Select
-                    value={client.stopOrder || 'none'}
+                    value={client.stopOrder || deductionTypeCache[client.id] || undefined}
                     onValueChange={(value) => {
-                      updateClientField(client.id, 'stopOrder', value === 'none' ? '' : value);
+                      updateClientField(client.id, 'stopOrder', value || '');
+                      setDeductionTypeCache((prev: Record<string, string>) => {
+                        const updated = { ...prev, [client.id]: value };
+                        // Persist to localStorage
+                        localStorage.setItem(`deductionType_${client.id}`, value);
+                        return updated;
+                      });
                     }}
                   >
                     <SelectTrigger className="w-full min-w-[200px]">

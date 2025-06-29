@@ -30,7 +30,7 @@ function mapClientForDb(client) {
   const existingColumns = [
     'deductiondate', 'policiescount', 'scheduledocsurl', 
     'pdfdocsurl', 'policynumbers', 'issuedate', 
-    'loadocurl', 'policypremium', 'name', 'location', 
+    'loadocurl', 'policypremium', 'stoporder', 'name', 'location', 
     'products', 'year', 'client_id', 'created_at'
   ];
 
@@ -53,7 +53,8 @@ function mapClientForDb(client) {
     'policyNumbers': 'policynumbers',
     'issueDate': 'issuedate',
     'loaDocUrl': 'loadocurl',
-    'policyPremium': 'policypremium'
+    'policyPremium': 'policypremium',
+    'stopOrder': 'stoporder'
   };
 
   // Apply field mappings
@@ -120,7 +121,8 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
   console.log('Existing Record:', JSON.stringify(existingRecord));
 
   // Prepare updates, preserving existing values for critical fields
-  const safeUpdates = { ...existingRecord };
+  // Start with empty object – we will add only allowed fields to minimize payload
+  const safeUpdates = {};
 
   // Mapping of fields with potential camelCase/snake_case variations
   const fieldMappings = {
@@ -131,14 +133,15 @@ export async function updateMonthlyClient(monthIndex, year, id, updates) {
     'pdfdocsurl': ['pdfDocsUrl', 'pdfdocsurl'],
     'deductiondate': ['deductionDate', 'deductiondate'],
     'issuedate': ['issueDate', 'issuedate'],
-    'loadocurl': ['loaDocUrl', 'loadocurl']
+    
+    'stoporder': ['stopOrder', 'stoporder']
   };
 
   // Allowed fields to update
   const updateableFields = [
     'name', 'location', 'products', 'deductiondate', 
     'scheduledocsurl', 'pdfdocsurl', 'policynumbers', 
-    'issuedate', 'loadocurl', 'policypremium', 'client_id',
+    'issuedate', 'policypremium', 'stoporder', 'client_id',
     'policiescount'
   ];
 
